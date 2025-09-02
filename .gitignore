@@ -1,0 +1,19 @@
+# Root ignores
+
+# Exclude local references and agent catalog from VCS
+/Referencias/
+/agents/
+
+# Local contributor guide (not for remote)
+/AGENTS.md
+
+# Common noise (optional but safe)
+.DS_Store
+Thumbs.db
+.env
+.env.*
+node_modules/
+dist/
+build/
+.vercel/
+.cache/

@@ -1,0 +1,15 @@
+{
+  "nodes": [
+    { "id": "root:alvo", "type": "Root", "label": "alvo" },
+    { "id": "platform:github", "type": "Platform", "label": "GitHub" },
+    { "id": "platform:twitter", "type": "Platform", "label": "Twitter" },
+    { "id": "id:name:alvo_silva", "type": "Identifier", "label": "Alvo da Silva", "masked": false },
+    { "id": "id:email:jo***@mail.com", "type": "Identifier", "label": "jo***@mail.com", "masked": true }
+  ],
+  "edges": [
+    { "from": "root:alvo", "to": "platform:github", "type": "scanned" },
+    { "from": "platform:github", "to": "id:name:alvo_silva", "type": "found_on" },
+    { "from": "platform:twitter", "to": "id:email:jo***@mail.com", "type": "recovery_mask" },
+    { "from": "id:name:alvo_silva", "to": "id:email:jo***@mail.com", "type": "corroborates" }
+  ]
+}

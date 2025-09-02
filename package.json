@@ -1,0 +1,16 @@
+{
+  "name": "aliasmap-monorepo",
+  "private": true,
+  "packageManager": "pnpm@8",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "lint": "pnpm -C apps/web run lint || true",
+    "typecheck": "pnpm -C apps/web run typecheck || true",
+    "test": "pnpm -C apps/web run test || true",
+    "coverage": "pnpm -C apps/web run coverage || true",
+    "build": "pnpm -C apps/web run build || true",
+    "dev": "pnpm -C apps/web run dev || true"
+  }
+}

@@ -1,0 +1,319 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ "**" ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '20'
+  PNPM_VERSION: '8'
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - name: Ensure pnpm via corepack
+        run: |
+          corepack enable
+          corepack prepare pnpm@${{ env.PNPM_VERSION }} --activate
+      - name: Ensure pnpm available
+        shell: bash
+        run: |
+          if ! command -v pnpm >/dev/null 2>&1; then
+            echo "pnpm not found; installing globally"
+            npm i -g pnpm@${{ env.PNPM_VERSION }}
+          else
+            echo "pnpm present: $(pnpm -v)"
+          fi
+      - name: Install deps
+        run: pnpm install --no-frozen-lockfile
+      - name: Lint
+        run: pnpm run --if-present lint
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - name: Ensure pnpm via corepack
+        run: |
+          corepack enable
+          corepack prepare pnpm@${{ env.PNPM_VERSION }} --activate
+      - name: Ensure pnpm available
+        shell: bash
+        run: |
+          if ! command -v pnpm >/dev/null 2>&1; then
+            echo "pnpm not found; installing globally"
+            npm i -g pnpm@${{ env.PNPM_VERSION }}
+          else
+            echo "pnpm present: $(pnpm -v)"
+          fi
+      - name: Install deps
+        run: pnpm install --no-frozen-lockfile
+      - name: Type check
+        run: pnpm run --if-present typecheck
+
+  test_unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - name: Ensure pnpm via corepack
+        run: |
+          corepack enable
+          corepack prepare pnpm@${{ env.PNPM_VERSION }} --activate
+      - name: Ensure pnpm available
+        shell: bash
+        run: |
+          if ! command -v pnpm >/dev/null 2>&1; then
+            echo "pnpm not found; installing globally"
+            npm i -g pnpm@${{ env.PNPM_VERSION }}
+          else
+            echo "pnpm present: $(pnpm -v)"
+          fi
+      - name: Install deps
+        run: pnpm install --no-frozen-lockfile
+      - name: Unit tests
+        run: |
+          pnpm run --if-present test:unit || pnpm run --if-present test
+
+  test_contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - name: Ensure pnpm via corepack
+        run: |
+          corepack enable
+          corepack prepare pnpm@${{ env.PNPM_VERSION }} --activate
+      - name: Ensure pnpm available
+        shell: bash
+        run: |
+          if ! command -v pnpm >/dev/null 2>&1; then
+            echo "pnpm not found; installing globally"
+            npm i -g pnpm@${{ env.PNPM_VERSION }}
+          else
+            echo "pnpm present: $(pnpm -v)"
+          fi
+      - name: Install deps
+        run: pnpm install --no-frozen-lockfile
+      - name: Contract tests (SSE)
+        run: pnpm run --if-present test:contract
+
+  test_e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - name: Ensure pnpm via corepack
+        run: |
+          corepack enable
+          corepack prepare pnpm@${{ env.PNPM_VERSION }} --activate
+      - name: Ensure pnpm available
+        shell: bash
+        run: |
+          if ! command -v pnpm >/dev/null 2>&1; then
+            echo "pnpm not found; installing globally"
+            npm i -g pnpm@${{ env.PNPM_VERSION }}
+          else
+            echo "pnpm present: $(pnpm -v)"
+          fi
+      - name: Install deps
+        run: pnpm install --no-frozen-lockfile
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+      - name: E2E tests (offline mocks)
+        run: pnpm run --if-present e2e
+
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - name: Ensure pnpm via corepack
+        run: |
+          corepack enable
+          corepack prepare pnpm@${{ env.PNPM_VERSION }} --activate
+      - name: Ensure pnpm available
+        shell: bash
+        run: |
+          if ! command -v pnpm >/dev/null 2>&1; then
+            echo "pnpm not found; installing globally"
+            npm i -g pnpm@${{ env.PNPM_VERSION }}
+          else
+            echo "pnpm present: $(pnpm -v)"
+          fi
+      - name: Install deps
+        run: pnpm install --no-frozen-lockfile
+      - name: Coverage report
+        run: pnpm run --if-present coverage
+
+  sast:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Semgrep SAST
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: p/ci
+          generateSarif: true
+      - name: Upload Semgrep SARIF
+        if: ${{ hashFiles('semgrep.sarif') != '' }}
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep.sarif
+
+  deps_audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - name: Ensure pnpm via corepack
+        run: |
+          corepack enable
+          corepack prepare pnpm@${{ env.PNPM_VERSION }} --activate
+      - name: Ensure pnpm available
+        shell: bash
+        run: |
+          if ! command -v pnpm >/dev/null 2>&1; then
+            echo "pnpm not found; installing globally"
+            npm i -g pnpm@${{ env.PNPM_VERSION }}
+          else
+            echo "pnpm present: $(pnpm -v)"
+          fi
+      - name: Install deps (prod)
+        run: pnpm install --prod --no-frozen-lockfile
+      - name: Audit (high and above)
+        run: pnpm audit --prod --audit-level high
+
+  secrets_scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        with:
+          args: detect --redact --no-banner
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - name: Ensure pnpm via corepack
+        run: |
+          corepack enable
+          corepack prepare pnpm@${{ env.PNPM_VERSION }} --activate
+      - name: Ensure pnpm available
+        shell: bash
+        run: |
+          if ! command -v pnpm >/dev/null 2>&1; then
+            echo "pnpm not found; installing globally"
+            npm i -g pnpm@${{ env.PNPM_VERSION }}
+          else
+            echo "pnpm present: $(pnpm -v)"
+          fi
+      - name: Install deps
+        run: pnpm install --no-frozen-lockfile
+      - name: Build
+        run: pnpm run --if-present build
+
+  sonarcloud:
+    name: SonarCloud
+    needs: [lint, typecheck, test_unit, test_contract, coverage]
+    runs-on: ubuntu-latest
+    environment: Sonarcloud
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - name: Ensure pnpm via corepack
+        run: |
+          corepack enable
+          corepack prepare pnpm@${{ env.PNPM_VERSION }} --activate
+      - name: Ensure pnpm available
+        shell: bash
+        run: |
+          if ! command -v pnpm >/dev/null 2>&1; then
+            echo "pnpm not found; installing globally"
+            npm i -g pnpm@${{ env.PNPM_VERSION }}
+          else
+            echo "pnpm present: $(pnpm -v)"
+          fi
+      - name: Install deps
+        run: pnpm install --no-frozen-lockfile
+      - name: Generate coverage (web)
+        run: pnpm -C apps/web run coverage || true
+      - name: SonarCloud Scan
+        if: ${{ env.SONAR_TOKEN != '' }}
+        uses: SonarSource/sonarcloud-github-action@v2
+        with:
+          args: >-
+            -Dsonar.projectKey=bob-reis_AliasMap
+            -Dsonar.organization=bob-reis
+            -Dsonar.sources=apps
+            -Dsonar.tests=apps
+            -Dsonar.javascript.lcov.reportPaths=apps/web/coverage/lcov.info
+            -Dsonar.typescript.tsconfigPath=apps/web/tsconfig.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
