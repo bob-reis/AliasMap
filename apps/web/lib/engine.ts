@@ -1,5 +1,5 @@
 import { CORE_SITES } from './sites.core';
-import type { SiteResult, SiteSpec } from './types';
+import type { SiteResult, SiteSpec, Evidence } from './types';
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
@@ -23,7 +23,17 @@ async function fetchWithTimeout(url: string, timeoutMs: number): Promise<Respons
   const ctrl = new AbortController();
   const id = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    const res = await fetch(url, { signal: ctrl.signal, redirect: 'follow', cache: 'no-store' });
+    const res = await fetch(url, {
+      signal: ctrl.signal,
+      redirect: 'follow',
+      cache: 'no-store',
+      headers: {
+        'Accept-Language': 'en-US,en;q=0.9',
+        // Generic desktop UA to reduce variant HTML
+        'User-Agent':
+          'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36'
+      }
+    });
     return res;
   } finally {
     clearTimeout(id);
@@ -40,6 +50,47 @@ async function checkSite(site: SiteSpec, username: string): Promise<SiteResult> 
 
   try {
     const timeout = site.profile.timeoutMs ?? 3500;
+
+    // Instagram: detect login redirect preserving username in `next` as strong existence signal
+    if (site.id === 'instagram') {
+      const ctrl0 = new AbortController();
+      const id0 = setTimeout(() => ctrl0.abort(), timeout);
+      try {
+        const res0 = await fetch(url, {
+          signal: ctrl0.signal,
+          redirect: 'manual',
+          headers: {
+            'Accept-Language': 'en-US,en;q=0.9',
+            'User-Agent':
+              'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36'
+          }
+        });
+        if (res0.status === 404) {
+          return { id: site.id, status: 'not_found', url, latencyMs: Date.now() - start };
+        }
+        if (res0.status >= 300 && res0.status < 400) {
+          const loc = res0.headers.get('location') || '';
+          const abs = (() => { try { return new URL(loc, url).href; } catch { return loc; } })();
+          const dec = decodeURIComponent(abs.toLowerCase());
+          const uname = (u ?? username).toLowerCase();
+          if (dec.includes('/accounts/login/') && dec.includes(`/${uname}/`)) {
+            return {
+              id: site.id,
+              status: 'found',
+              url,
+              latencyMs: Date.now() - start,
+              evidence: [{ kind: 'final_url', value: abs }]
+            };
+          }
+        }
+        // Fall through to content-based heuristics below
+      } catch (_) {
+        // ignore and continue to generic flow
+      } finally {
+        clearTimeout(id0);
+      }
+    }
+
     const res = await fetchWithTimeout(url, timeout);
     const status = res.status;
     if (status === 404) {
@@ -47,6 +98,25 @@ async function checkSite(site: SiteSpec, username: string): Promise<SiteResult> 
     }
     const body = await res.text();
     const flags = site.norm?.caseSensitive ? 'm' : 'mi';
+    // Extract canonical and og:url for strong confirmation
+    const canonicalMatch = body.match(/<link[^>]+rel=["']canonical["'][^>]+href=["']([^"']+)/i);
+    const ogUrlMatch = body.match(/<meta[^>]+property=["']og:url["'][^>]+content=["']([^"']+)/i);
+    const canonical = canonicalMatch?.[1];
+    const ogUrl = ogUrlMatch?.[1];
+    const expectedUrl = url;
+    const expectedHost = (() => { try { return new URL(expectedUrl).host.toLowerCase(); } catch { return ''; } })();
+    const usernameLower = (u ?? username).toLowerCase();
+    const matchesProfile = (val?: string) => {
+      if (!val) return false;
+      try {
+        const parsed = new URL(val, expectedUrl);
+        const host = parsed.host.toLowerCase();
+        const path = parsed.pathname.toLowerCase().replace(/\/+$/,'');
+        return host === expectedHost && path.includes(usernameLower);
+      } catch {
+        return false;
+      }
+    };
     // Prefer patterns that include the username to reduce false positives
     const successOrdered = [...site.profile.successPatterns].sort((a, b) => {
       const au = a.includes('{username}') ? 0 : 1;
@@ -65,8 +135,32 @@ async function checkSite(site: SiteSpec, username: string): Promise<SiteResult> 
     // Extra guard: if success pattern doesn't include username, also require body to contain username
     const hasUsernameText = (u ?? username);
     const usernameOk = matchedSuccess?.includes('{username}') ? true : new RegExp(hasUsernameText, flags).test(body);
-    if (matchedSuccess && !matchedNotFound && usernameOk) {
-      return { id: site.id, status: 'found', url, latencyMs: Date.now() - start, evidence: [{ kind: 'pattern', value: matchedSuccess }] };
+    const canonicalOk = matchesProfile(canonical ?? undefined);
+    const ogOk = matchesProfile(ogUrl ?? undefined);
+    const finalUrlOk = matchesProfile(res.url);
+
+    // Site-specific tightening: Instagram requires canonical or og:url; URL path alone is not enough
+    if (site.id === 'instagram') {
+      if (!matchedNotFound && usernameOk && (canonicalOk || ogOk)) {
+        const evidence: Evidence[] = [];
+        if (canonicalOk && canonical) evidence.push({ kind: 'canonical', value: canonical });
+        if (ogOk && ogUrl) evidence.push({ kind: 'og:url', value: ogUrl });
+        if (!evidence.length) evidence.push({ kind: 'username-text', value: (u ?? username) });
+        return { id: site.id, status: 'found', url, latencyMs: Date.now() - start, evidence };
+      }
+      if (matchedNotFound) {
+        return { id: site.id, status: 'not_found', url, latencyMs: Date.now() - start, evidence: [{ kind: 'pattern', value: matchedNotFound }] };
+      }
+      return { id: site.id, status: 'inconclusive', url, latencyMs: Date.now() - start };
+    }
+
+    if (matchedSuccess && !matchedNotFound && usernameOk && (canonicalOk || ogOk || finalUrlOk)) {
+      const evidence: Evidence[] = [];
+      evidence.push({ kind: 'pattern', value: matchedSuccess });
+      if (canonicalOk && canonical) evidence.push({ kind: 'canonical', value: canonical });
+      if (ogOk && ogUrl) evidence.push({ kind: 'og:url', value: ogUrl });
+      if (finalUrlOk && res.url) evidence.push({ kind: 'final_url', value: res.url });
+      return { id: site.id, status: 'found', url, latencyMs: Date.now() - start, evidence };
     }
     if (matchedNotFound) {
       return { id: site.id, status: 'not_found', url, latencyMs: Date.now() - start, evidence: [{ kind: 'pattern', value: matchedNotFound }] };

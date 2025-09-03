@@ -28,8 +28,8 @@ export interface SiteSpec {
 }
 
 export interface Evidence {
-  kind: 'pattern';
-  value: string; // the pattern that matched
+  kind: 'pattern' | 'canonical' | 'og:url' | 'final_url' | 'username-text';
+  value: string; // supporting evidence for classification
 }
 
 export interface SiteResult {

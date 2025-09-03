@@ -21,7 +21,7 @@ export function MindmapPreview({ username, items }: { username: string; items: I
       const y = cy + radius * Math.sin(angle);
       return { ...it, x, y };
     });
-  }, [items]);
+  }, [items, cx, cy, radius]);
 
   const colorFor = (status: string) => {
     if (status === 'found') return '#10B981'; // green

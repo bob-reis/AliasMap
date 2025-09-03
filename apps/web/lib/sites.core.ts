@@ -79,8 +79,11 @@ export const CORE_SITES: SiteSpec[] = [
     tier: 'fundamental',
     profile: {
       url: 'https://www.instagram.com/{username}/',
-      successPatterns: ['property="og:title"', 'content="{username}"'],
-      notFoundPatterns: ["Sorry, this page isn't available."],
+      successPatterns: ['property="og:url"', 'instagram.com/{username}'],
+      notFoundPatterns: [
+        "Sorry, this page isn't available.",
+        'Esta página não está disponível'
+      ],
       timeoutMs: 3500
     },
     recovery: { enabled: true, risk: 'amber', endpoint: 'https://www.instagram.com/accounts/password/reset/', method: 'GET' }
