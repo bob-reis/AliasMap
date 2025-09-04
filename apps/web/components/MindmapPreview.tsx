@@ -4,6 +4,7 @@ type Item = {
   platform: string;
   status: 'found' | 'not_found' | 'inconclusive' | string;
   rawStatus?: 'found' | 'not_found' | 'inconclusive' | string;
+  heuristic?: boolean;
 };
 
 export function MindmapPreview({ username, items }: { username: string; items: Item[] }) {
@@ -53,10 +54,24 @@ export function MindmapPreview({ username, items }: { username: string; items: I
         {/* Platform nodes */}
         {nodes.map((n) => (
           <g key={n.platform}>
-            <circle cx={n.x} cy={n.y} r={20} fill="#FFFFFF" stroke={colorFor(n.rawStatus ?? n.status)} strokeWidth={2} filter="url(#shadow)" />
+            <circle
+              cx={n.x}
+              cy={n.y}
+              r={20}
+              fill="#FFFFFF"
+              stroke={colorFor(n.rawStatus ?? n.status)}
+              strokeWidth={2}
+              filter="url(#shadow)"
+              strokeDasharray={n.heuristic ? '4 3' : undefined}
+            />
             <text x={n.x} y={n.y} textAnchor="middle" dominantBaseline="middle" fill="#111827" fontSize={11}>
               {n.platform}
             </text>
+            {n.heuristic && (
+              <text x={n.x} y={n.y + 15} textAnchor="middle" fill="#6B7280" fontSize={9}>
+                heurístico
+              </text>
+            )}
           </g>
         ))}
       </svg>

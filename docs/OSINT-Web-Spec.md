@@ -69,3 +69,4 @@ Exemplo (simplificado):
 ## Pendências para validação
 - Confirmar lista final e risco de recuperação por plataforma.
 - Ajustar padrões de sucesso/erro por site e normalização de username.
+ - Fast mode: opcional, status-only (HTTP), usando lista ampla (infoooze). Marcar resultados como heurísticos (mais rápido, menor precisão) e não misturar com evidências fortes.
