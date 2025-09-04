@@ -156,6 +156,30 @@ async function checkSite(site: SiteSpec, username: string): Promise<SiteResult> 
       return { id: site.id, status: 'inconclusive', url, latencyMs: Date.now() - start };
     }
 
+    // Site-specific override: Twitch message "time machine" indicates closed/suspended channel.
+    // Treat as exists per investigation context.
+    if (site.id === 'twitch') {
+      if (matchedNotFound && /time machine/i.test(matchedNotFound)) {
+        return {
+          id: site.id,
+          status: 'found',
+          url,
+          latencyMs: Date.now() - start,
+          evidence: [{ kind: 'pattern', value: matchedNotFound }]
+        };
+      }
+    }
+
+    // Site-specific: Twitter suspended accounts count as present
+    if (site.id === 'twitter') {
+      const suspended = /suspended/i.test(body);
+      if (!matchedNotFound && suspended) {
+        const evidence: Evidence[] = [{ kind: 'pattern', value: 'Account suspended' }];
+        if (canonicalOk && canonical) evidence.push({ kind: 'canonical', value: canonical });
+        return { id: site.id, status: 'found', url, latencyMs: Date.now() - start, evidence };
+      }
+    }
+
     // Generic fallback: if site declares no successPatterns, accept canonical/og/final URL evidence
     if ((!site.profile.successPatterns || site.profile.successPatterns.length === 0) && !matchedNotFound && usernameOk && (canonicalOk || ogOk || finalUrlOk)) {
       const evidence: Evidence[] = [];

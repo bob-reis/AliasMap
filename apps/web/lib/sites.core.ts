@@ -35,7 +35,12 @@ export const CORE_SITES: SiteSpec[] = [
     profile: {
       url: 'https://www.linkedin.com/in/{username}',
       successPatterns: ['LinkedIn', 'in/{username}'],
-      notFoundPatterns: ["This page doesn’t exist", 'A página não existe'],
+      notFoundPatterns: [
+        "This page doesn’t exist",
+        'A página não existe',
+        'Profile Not Found',
+        'Page not found'
+      ],
       timeoutMs: 3500
     },
     recovery: { enabled: false, risk: 'red' }
@@ -57,7 +62,7 @@ export const CORE_SITES: SiteSpec[] = [
     profile: {
       url: 'https://www.reddit.com/user/{username}',
       successPatterns: ['u/{username}', 'rel="canonical".*reddit.com/user/{username}'],
-      notFoundPatterns: ['page not found'],
+      notFoundPatterns: ['page not found', 'Sorry, nobody on Reddit goes by that name.'],
       timeoutMs: 3500
     },
     recovery: { enabled: true, risk: 'green', endpoint: 'https://www.reddit.com/password', method: 'GET' }
@@ -68,7 +73,7 @@ export const CORE_SITES: SiteSpec[] = [
     norm: { caseSensitive: false, allowed: '[a-z0-9_]{1,15}' },
     profile: {
       url: 'https://x.com/{username}',
-      successPatterns: ['Followers', 'Following', 'Tweets', 'rel="canonical".*x.com/{username}'],
+      successPatterns: ['Followers', 'Following', 'Tweets', 'rel="canonical".*x.com/{username}', 'Account suspended'],
       notFoundPatterns: ['This account doesn’t exist', 'Try searching for another'],
       timeoutMs: 3500
     },
@@ -94,7 +99,7 @@ export const CORE_SITES: SiteSpec[] = [
     profile: {
       url: 'https://www.youtube.com/@{username}',
       successPatterns: ['Subscribe', 'link rel="canonical".*youtube.com/@{username}'],
-      notFoundPatterns: ['404', 'This page isn’t available'],
+      notFoundPatterns: ['This page isn’t available'],
       timeoutMs: 3500
     },
     recovery: { enabled: false, risk: 'amber' }
@@ -190,6 +195,74 @@ export const CORE_SITES: SiteSpec[] = [
       timeoutMs: 3500
     },
     recovery: { enabled: true, risk: 'amber', endpoint: 'https://stackoverflow.com/users/account-recovery', method: 'GET' }
+  },
+
+  // Additional high-value platforms from infoooze with tailored heuristics
+  {
+    id: 'pinterest',
+    tier: 'core',
+    profile: {
+      url: 'https://pinterest.com/{username}',
+      successPatterns: ['rel="canonical".*pinterest.com/{username}'],
+      notFoundPatterns: ['Page not found', 'User not found'],
+      timeoutMs: 3500
+    },
+    recovery: { enabled: false, risk: 'amber' }
+  },
+  {
+    id: 'medium',
+    tier: 'core',
+    profile: {
+      url: 'https://medium.com/@{username}',
+      successPatterns: ['rel="canonical".*medium.com/@{username}'],
+      notFoundPatterns: ['Username available', '404', 'Page not found'],
+      timeoutMs: 3500
+    },
+    recovery: { enabled: false, risk: 'amber' }
+  },
+  {
+    id: 'slideshare',
+    tier: 'core',
+    profile: {
+      url: 'https://slideshare.net/{username}',
+      successPatterns: ['rel="canonical".*slideshare.net/{username}'],
+      notFoundPatterns: ['Username available'],
+      timeoutMs: 3500
+    },
+    recovery: { enabled: false, risk: 'amber' }
+  },
+  {
+    id: 'gravatar',
+    tier: 'core',
+    profile: {
+      url: 'https://en.gravatar.com/{username}',
+      successPatterns: ['rel="canonical".*gravatar.com/{username}'],
+      notFoundPatterns: ['not found', '404'],
+      timeoutMs: 3500
+    },
+    recovery: { enabled: false, risk: 'amber' }
+  },
+  {
+    id: 'ello',
+    tier: 'core',
+    profile: {
+      url: 'https://ello.co/{username}',
+      successPatterns: ['rel="canonical".*ello.co/{username}'],
+      notFoundPatterns: ['404', 'Page not found'],
+      timeoutMs: 3500
+    },
+    recovery: { enabled: false, risk: 'amber' }
+  },
+  {
+    id: 'tripadvisor',
+    tier: 'core',
+    profile: {
+      url: 'https://www.tripadvisor.com/members/{username}',
+      successPatterns: ['rel="canonical".*tripadvisor.com/Profile/{username}', 'Profile/{username}'],
+      notFoundPatterns: ['This page isn\u2019t available', 'Page not found', 'doesn\u2019t exist'],
+      timeoutMs: 4000
+    },
+    recovery: { enabled: false, risk: 'amber' }
   },
 
 ];
