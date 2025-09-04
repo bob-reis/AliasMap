@@ -18,13 +18,13 @@ export default function Home() {
   const [username, setUsername] = useState('');
   const [events, setEvents] = useState<SiteEvent[]>([]);
   const [running, setRunning] = useState(false);
-  // Always show only "found" (including previous "inconclusive")
+  // Show only truly found; do not coerce 'inconclusive' to 'found'
 
   const canStart = useMemo(() => {
     return !running && username.trim().length > 0;
   }, [running, username]);
 
-  const asFound = (s: string) => (s === 'inconclusive' ? 'found' : s);
+  const identityStatus = (s: string) => s;
 
   // Progress is intentionally hidden from the UI per request.
 
@@ -37,7 +37,7 @@ export default function Home() {
     for (const e of events) {
       if (e.type === 'site_result') {
         const label = platformLabel(e.id);
-        map.set(e.id, { ...e, rawStatus: e.status, status: asFound(e.status), platform: label });
+        map.set(e.id, { ...e, rawStatus: e.status, status: identityStatus(e.status), platform: label });
       }
     }
     return Array.from(map.values());
@@ -90,7 +90,7 @@ export default function Home() {
     const rows = [['platform', 'status', 'url', 'latencyMs', 'reason', 'heuristic']];
     for (const e of events) {
       if (e.type === 'site_result') {
-        const st = asFound(e.status);
+        const st = e.status;
         rows.push([
           e.id,
           st,
@@ -137,19 +137,12 @@ export default function Home() {
 
       {/* Progress hidden */}
 
-      <ul style={{ marginTop: 16 }}>
-        {events.filter(e => e.type !== 'progress').map((e, i) => {
-          const label = ('id' in e && e.id) ? platformLabel((e as any).id) : '';
-          return (
-            <li key={i}>
-              <code>{e.type}</code> {label || (('id' in e) ? (e as any).id : '')} {('status' in e) ? `→ ${e.status}` : ''}
-              {('url' in e && (e as any).url) ? (
-                <> — <a href={(e as any).url} target="_blank" rel="noopener noreferrer">abrir</a></>
-              ) : null}
-            </li>
-          );
-        })}
-      </ul>
+      {running ? (
+        <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span aria-hidden>⏳</span>
+          <span>Varredura em andamento…</span>
+        </div>
+      ) : null}
 
       <section style={{ marginTop: 24 }}>
         <h2>Mindmap (pré-visualização)</h2>

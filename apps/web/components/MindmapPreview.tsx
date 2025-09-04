@@ -53,9 +53,9 @@ export function MindmapPreview({ username, items }: { username: string; items: I
         ))}
 
         {/* Platform nodes */}
-        {nodes.map((n) => (
-          <a key={n.platform} href={n.url} target="_blank" rel="noopener noreferrer">
-            <g>
+        {nodes.map((n) => {
+          const content = (
+            <g key={n.platform}>
               <circle
                 cx={n.x}
                 cy={n.y}
@@ -75,8 +75,13 @@ export function MindmapPreview({ username, items }: { username: string; items: I
                 </text>
               )}
             </g>
-          </a>
-        ))}
+          );
+          return n.url ? (
+            <a key={n.platform} href={n.url} target="_blank" rel="noopener noreferrer">
+              {content}
+            </a>
+          ) : content;
+        })}
       </svg>
     </div>
   );
