@@ -26,10 +26,7 @@ export default function Home() {
 
   const asFound = (s: string) => (s === 'inconclusive' ? 'found' : s);
 
-  const progress = useMemo(() => {
-    const last = [...events].reverse().find(e => e.type === 'progress') as SiteEvent | undefined;
-    return last && last.type === 'progress' ? last : undefined;
-  }, [events]);
+  // Progress is intentionally hidden from the UI per request.
 
   const latestByPlatform = useMemo(() => {
     type SiteResultEvent = Extract<SiteEvent, { type: 'site_result' }>;
@@ -138,12 +135,10 @@ export default function Home() {
         <Link href="/ethics" style={{ marginLeft: 'auto' }}>Aviso e Uso Ético</Link>
       </div>
 
-      {progress && progress.type === 'progress' && (
-        <p style={{ marginTop: 8 }}>Progresso: {progress.done}/{progress.total}</p>
-      )}
+      {/* Progress hidden */}
 
       <ul style={{ marginTop: 16 }}>
-        {events.map((e, i) => {
+        {events.filter(e => e.type !== 'progress').map((e, i) => {
           const label = ('id' in e && e.id) ? platformLabel((e as any).id) : '';
           return (
             <li key={i}>
