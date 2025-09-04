@@ -18,7 +18,6 @@ export default function Home() {
   const [username, setUsername] = useState('');
   const [events, setEvents] = useState<SiteEvent[]>([]);
   const [running, setRunning] = useState(false);
-  const [mode, setMode] = useState<'precise' | 'fast'>('fast');
   // Always show only "found" (including previous "inconclusive")
 
   const canStart = useMemo(() => {
@@ -51,7 +50,7 @@ export default function Home() {
     if (!username) return;
     setEvents([]);
     setRunning(true);
-    const es = new EventSource(`/api/scan?username=${encodeURIComponent(username)}&tier=fundamental&mode=${mode}`);
+    const es = new EventSource(`/api/scan?username=${encodeURIComponent(username)}&tier=all`);
 
     es.onmessage = (msg) => {
       try {
@@ -127,24 +126,6 @@ export default function Home() {
           disabled={running}
           style={{ padding: 8, border: '1px solid #d1d5db', borderRadius: 6 }}
         />
-        <div role="group" aria-label="Modo" style={{ display: 'inline-flex', border: '1px solid #d1d5db', borderRadius: 6, overflow: 'hidden' }}>
-          <button
-            onClick={() => setMode('precise')}
-            disabled={running}
-            style={{ padding: '8px 10px', background: mode === 'precise' ? '#111827' : '#fff', color: mode === 'precise' ? '#fff' : '#111827', borderRight: '1px solid #d1d5db' }}
-            title="Preciso: evidências fortes (mais lento)"
-          >
-            Preciso
-          </button>
-          <button
-            onClick={() => setMode('fast')}
-            disabled={running}
-            style={{ padding: '8px 10px', background: mode === 'fast' ? '#111827' : '#fff', color: mode === 'fast' ? '#fff' : '#111827' }}
-            title="Rápido: heurístico por status HTTP (mais rápido)"
-          >
-            Rápido
-          </button>
-        </div>
         <button onClick={startScan} disabled={!canStart} style={{ padding: '8px 12px' }}>
           {running ? 'Executando…' : 'Iniciar varredura'}
         </button>

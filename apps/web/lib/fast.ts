@@ -54,16 +54,33 @@ export async function runFastRecon(opts: FastOptions): Promise<FastResult[]> {
         try {
           const res = await fetchWithTimeout(url, timeoutMs);
           const code = res.status;
-          let status: FastStatus;
-          if (code === 200 || (code >= 201 && code < 300)) {
-            status = 'found';
-          } else if (code === 404 || code === 410) {
+          // Lightweight heuristic: require final URL, canonical or og:url to mention username for 'found'
+          let status: FastStatus = 'inconclusive';
+          if (code === 404 || code === 410) {
             status = 'not_found';
           } else if (code === 0) {
             status = 'error';
           } else {
-            // 3xx followed, 401/403/429 and other oddities → inconclusive
-            status = 'inconclusive';
+            // 2xx/3xx/401/403/429 → check hints
+            let body = '';
+            try { body = await res.text(); } catch { /* ignore */ }
+            const u = (res as any).url || url;
+            const expectedHost = (() => { try { return new URL(url).host.toLowerCase(); } catch { return ''; } })();
+            const usernameLower = opts.username.toLowerCase();
+            const finalOk = (() => { try { const p = new URL(u); return p.host.toLowerCase().includes(expectedHost) && p.href.toLowerCase().includes(usernameLower); } catch { return false; } })();
+            const canonicalMatch = body.match(/<link[^>]+rel=["']canonical["'][^>]+href=["']([^"']+)/i);
+            const ogUrlMatch = body.match(/<meta[^>]+property=["']og:url["'][^>]+content=["']([^"']+)/i);
+            const canonical = canonicalMatch?.[1];
+            const ogUrl = ogUrlMatch?.[1];
+            const profileOk = (val?: string) => {
+              if (!val) return false;
+              try { const p = new URL(val, u); return p.host.toLowerCase().includes(expectedHost) && p.href.toLowerCase().includes(usernameLower); } catch { return false; }
+            };
+            if (finalOk || profileOk(canonical) || profileOk(ogUrl)) {
+              status = 'found';
+            } else {
+              status = 'inconclusive';
+            }
           }
           return { url, status, statusCode: code, latencyMs: Date.now() - start } satisfies FastResult;
         } catch (e: any) {
@@ -75,4 +92,3 @@ export async function runFastRecon(opts: FastOptions): Promise<FastResult[]> {
   }
   return out;
 }
-

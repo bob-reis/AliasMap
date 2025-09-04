@@ -1,5 +1,7 @@
 import { CORE_SITES } from './sites.core';
-import type { SiteResult, SiteSpec, Evidence } from './types';
+import type { SiteResult, SiteSpec, Evidence, Tier } from './types';
+import { INFOOOZE_URLS } from './sites.infoooze';
+import { canonicalPlatformIdFromUrl } from './platforms';
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
@@ -118,7 +120,7 @@ async function checkSite(site: SiteSpec, username: string): Promise<SiteResult> 
       }
     };
     // Prefer patterns that include the username to reduce false positives
-    const successOrdered = [...site.profile.successPatterns].sort((a, b) => {
+    const successOrdered = [...(site.profile.successPatterns ?? [])].sort((a, b) => {
       const au = a.includes('{username}') ? 0 : 1;
       const bu = b.includes('{username}') ? 0 : 1;
       return au - bu;
@@ -154,6 +156,16 @@ async function checkSite(site: SiteSpec, username: string): Promise<SiteResult> 
       return { id: site.id, status: 'inconclusive', url, latencyMs: Date.now() - start };
     }
 
+    // Generic fallback: if site declares no successPatterns, accept canonical/og/final URL evidence
+    if ((!site.profile.successPatterns || site.profile.successPatterns.length === 0) && !matchedNotFound && usernameOk && (canonicalOk || ogOk || finalUrlOk)) {
+      const evidence: Evidence[] = [];
+      if (canonicalOk && canonical) evidence.push({ kind: 'canonical', value: canonical });
+      if (ogOk && ogUrl) evidence.push({ kind: 'og:url', value: ogUrl });
+      if (finalUrlOk && res.url) evidence.push({ kind: 'final_url', value: res.url });
+      if (!evidence.length) evidence.push({ kind: 'username-text', value: (u ?? username) });
+      return { id: site.id, status: 'found', url, latencyMs: Date.now() - start, evidence };
+    }
+
     if (matchedSuccess && !matchedNotFound && usernameOk && (canonicalOk || ogOk || finalUrlOk)) {
       const evidence: Evidence[] = [];
       evidence.push({ kind: 'pattern', value: matchedSuccess });
@@ -173,14 +185,40 @@ async function checkSite(site: SiteSpec, username: string): Promise<SiteResult> 
 
 export interface ScanOptions {
   username: string;
-  tier?: 'fundamental' | 'core' | 'optional';
+  tier?: Tier;
   concurrency?: number;
 }
 
 export async function* runScan(opts: ScanOptions) {
   const tier = opts.tier ?? 'fundamental';
   const concurrency = Math.max(1, Math.min(opts.concurrency ?? 6, 10));
-  const sites = CORE_SITES.filter(s => s.tier === tier);
+  let sites: SiteSpec[];
+  if (tier === 'all') {
+    // Build dynamic sites from infoooze URL templates
+    const coreById = new Map(CORE_SITES.map(s => [s.id, s] as const));
+    const extra: SiteSpec[] = [];
+    const seen = new Set<string>(coreById.keys());
+    for (const tpl of INFOOOZE_URLS) {
+      const sample = tpl.replace('{username}', 'aliasmap');
+      const id = canonicalPlatformIdFromUrl(sample);
+      if (seen.has(id)) continue;
+      seen.add(id);
+      extra.push({
+        id,
+        tier: 'core',
+        profile: {
+          url: tpl,
+          successPatterns: [],
+          notFoundPatterns: ['Not Found', 'not found', 'Page not found', '404'],
+          timeoutMs: 3500
+        },
+        recovery: { enabled: false, risk: 'amber' }
+      });
+    }
+    sites = [...CORE_SITES, ...extra];
+  } else {
+    sites = CORE_SITES.filter(s => s.tier === tier);
+  }
 
   yield { type: 'progress', done: 0, total: sites.length } as const;
   let done = 0;

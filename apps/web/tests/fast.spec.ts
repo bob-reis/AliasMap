@@ -16,18 +16,18 @@ describe('runFastRecon (status-only fast mode)', () => {
     // @ts-expect-error - override global
     global.fetch = vi.fn(async (url: string) => {
       if (url.includes('/u/')) {
-        return { status: 200 } as any;
+        return { status: 200, url, text: async () => `<link rel="canonical" href="${url}">` } as any;
       }
       if (url.includes('/missing/')) {
-        return { status: 404 } as any;
+        return { status: 404, url, text: async () => '' } as any;
       }
       if (url.includes('/blocked/')) {
-        return { status: 403 } as any;
+        return { status: 403, url, text: async () => '' } as any;
       }
       if (url.includes('/error/')) {
         throw new Error('boom');
       }
-      return { status: 418 } as any; // default inconclusive
+      return { status: 418, url, text: async () => '' } as any; // default inconclusive
     });
   });
 
@@ -49,4 +49,3 @@ describe('runFastRecon (status-only fast mode)', () => {
     expect(byUrl['https://example.com/error/alice'].status).toBe('error');
   });
 });
-

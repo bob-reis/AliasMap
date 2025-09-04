@@ -1,4 +1,4 @@
-export type Tier = 'fundamental' | 'core' | 'optional';
+export type Tier = 'fundamental' | 'core' | 'optional' | 'all';
 
 export interface SiteNorm {
   caseSensitive?: boolean;

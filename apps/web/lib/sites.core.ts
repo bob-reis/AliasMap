@@ -111,6 +111,43 @@ export const CORE_SITES: SiteSpec[] = [
     recovery: { enabled: true, risk: 'amber', endpoint: 'https://www.tiktok.com/login/phone-or-email/email', method: 'GET' }
   },
   {
+    id: 'steam',
+    tier: 'fundamental',
+    profile: {
+      url: 'https://steamcommunity.com/id/{username}',
+      successPatterns: [
+        'Steam Community',
+        'rel="canonical".*steamcommunity.com/id/{username}'
+      ],
+      notFoundPatterns: [
+        'The specified profile could not be found',
+        'No match',
+        'was not found'
+      ],
+      timeoutMs: 3500
+    },
+    recovery: { enabled: false, risk: 'red' }
+  },
+  {
+    id: 'flipboard',
+    tier: 'fundamental',
+    profile: {
+      url: 'https://flipboard.com/@{username}',
+      successPatterns: [
+        'Flipboard',
+        'rel="canonical".*flipboard.com/@{username}',
+        '@{username}'
+      ],
+      notFoundPatterns: [
+        'Not Found',
+        'Page not found',
+        "We couldn't find"
+      ],
+      timeoutMs: 3500
+    },
+    recovery: { enabled: false, risk: 'amber' }
+  },
+  {
     id: 'twitch',
     tier: 'fundamental',
     profile: {
