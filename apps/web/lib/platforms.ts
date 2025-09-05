@@ -38,7 +38,6 @@ export function canonicalPlatformIdFromUrl(rawUrl: string): string {
     if (ends('dribbble.com')) return 'dribbble';
     if (ends('gravatar.com')) return 'gravatar';
     if (ends('foursquare.com')) return 'foursquare';
-    if (ends('creativemarket.com')) return 'creativemarket';
     if (ends('ello.co')) return 'ello';
     if (ends('cash.me')) return 'cashapp';
     if (ends('angel.co')) return 'angel';
@@ -70,12 +69,10 @@ export function canonicalPlatformIdFromUrl(rawUrl: string): string {
     if (ends('reverbnation.com')) return 'reverbnation';
     if (ends('designspiration.net')) return 'designspiration';
     if (ends('bandcamp.com')) return 'bandcamp';
-    if (ends('colourlovers.com')) return 'colourlovers';
     if (ends('ifttt.com')) return 'ifttt';
     if (ends('trakt.tv')) return 'trakt';
     if (ends('okcupid.com')) return 'okcupid';
     if (ends('skyscanner.com')) return 'skyscanner';
-    if (ends('zone-h.org')) return 'zone-h';
     return base;
   } catch {
     return rawUrl;
@@ -118,7 +115,6 @@ export function platformLabel(id: string): string {
     dribbble: 'Dribbble',
     gravatar: 'Gravatar',
     foursquare: 'Foursquare',
-    creativemarket: 'Creative Market',
     ello: 'Ello',
     cashapp: 'Cash App',
     angel: 'AngelList',
@@ -150,12 +146,10 @@ export function platformLabel(id: string): string {
     reverbnation: 'ReverbNation',
     designspiration: 'Designspiration',
     bandcamp: 'Bandcamp',
-    colourlovers: 'COLOURlovers',
     ifttt: 'IFTTT',
     trakt: 'Trakt',
     okcupid: 'OkCupid',
     skyscanner: 'Skyscanner',
-    'zone-h': 'Zone-H',
     telegram: 'Telegram',
     linkedin: 'LinkedIn',
     gitlab: 'GitLab',

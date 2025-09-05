@@ -34,7 +34,6 @@ export const INFOOOZE_URLS: string[] = [
   'https://dribbble.com/{username}',
   'https://en.gravatar.com/{username}',
   'https://foursquare.com/{username}',
-  'https://creativemarket.com/{username}',
   'https://ello.co/{username}',
   'https://cash.me/{username}',
   'https://angel.co/{username}',
@@ -68,11 +67,9 @@ export const INFOOOZE_URLS: string[] = [
   'https://www.reverbnation.com/{username}',
   'https://www.designspiration.net/{username}',
   'https://www.bandcamp.com/{username}',
-  'https://www.colourlovers.com/love/{username}',
   'https://www.ifttt.com/p/{username}',
   'https://www.trakt.tv/users/{username}',
   'https://www.okcupid.com/profile/{username}',
   'https://www.trip.skyscanner.com/user/{username}',
-  'http://www.zone-h.org/archive/notifier={username}',
   'http://old.reddit.com/user/{username}'
 ];

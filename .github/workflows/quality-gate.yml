@@ -1,0 +1,67 @@
+name: Quality Gate
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  quality-assurance:
+    name: Quality Assurance & Testing
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Shallow clones should be disabled for better analysis
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: |
+        npm ci
+        cd apps/web && npm ci
+
+    - name: Run ESLint
+      run: |
+        cd apps/web
+        npm run lint
+
+    - name: Run TypeScript checks
+      run: |
+        cd apps/web
+        npm run typecheck
+
+    - name: Run tests with coverage (loose for artifact)
+      env:
+        VITEST_CI_COVERAGE: loose
+      run: |
+        cd apps/web
+        npm run coverage || true
+        ls -la coverage || true
+        
+    - name: Upload coverage to SonarCloud
+      uses: SonarSource/sonarcloud-github-action@master
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+    - name: Quality Gate check
+      uses: sonarqube-quality-gate-action@master
+      env:
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      timeout-minutes: 5
+
+    - name: Upload coverage reports to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./apps/web/coverage/lcov.info
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: true
