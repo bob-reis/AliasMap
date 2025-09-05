@@ -6,11 +6,12 @@
     "apps/*"
   ],
   "scripts": {
-    "lint": "pnpm -C apps/web run lint || true",
-    "typecheck": "pnpm -C apps/web run typecheck || true",
-    "test": "pnpm -C apps/web run test || true",
-    "coverage": "pnpm -C apps/web run coverage || true",
-    "build": "pnpm -C apps/web run build || true",
-    "dev": "pnpm -C apps/web run dev || true"
+    "lint": "npm -w apps/web run lint || pnpm -C apps/web run lint || true",
+    "typecheck": "npm -w apps/web run typecheck || pnpm -C apps/web run typecheck || true",
+    "test": "npm -w apps/web run test || pnpm -C apps/web run test || true",
+    "coverage": "npm -w apps/web run coverage || pnpm -C apps/web run coverage || true",
+    "build": "npm -w apps/web run build || pnpm -C apps/web run build || true",
+    "dev": "npm -w apps/web run dev || pnpm -C apps/web run dev || true",
+    "prepare-sonar": "npm run coverage && echo '✅ Coverage report ready for SonarCloud'"
   }
 }

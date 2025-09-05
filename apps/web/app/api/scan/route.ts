@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { runScan } from '../../../lib/engine';
+import { runEnhancedScan, getCurrentMetrics } from '../../../lib/enhanced-engine';
 
 function sseSerialize(obj: any) {
   return `data: ${JSON.stringify(obj)}\n\n`;
@@ -9,6 +9,8 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const username = searchParams.get('username') || '';
   const tier = (searchParams.get('tier') as 'fundamental' | 'core' | 'optional' | 'all') || 'fundamental';
+  const useValidation = searchParams.get('validation') !== 'false'; // Default true
+  const trackMetrics = searchParams.get('metrics') !== 'false'; // Default true
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -20,8 +22,15 @@ export async function GET(req: NextRequest) {
           return;
         }
 
-        // precise mode via engine (pattern/evidence-based) on full curated set
-        const iter = runScan({ username, tier, concurrency: 6 });
+        // Enhanced mode with validation and metrics tracking
+        const iter = runEnhancedScan({ 
+          username, 
+          tier, 
+          concurrency: 6,
+          useValidation,
+          trackMetrics
+        });
+        
         for await (const ev of iter) {
           write(ev);
         }

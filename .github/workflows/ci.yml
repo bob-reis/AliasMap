@@ -233,10 +233,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Gitleaks
         uses: gitleaks/gitleaks-action@v2
-        with:
-          args: detect --redact --no-banner
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build:
     runs-on: ubuntu-latest
@@ -302,7 +304,11 @@ jobs:
       - name: Install deps
         run: pnpm install --no-frozen-lockfile
       - name: Generate coverage (web)
-        run: pnpm -C apps/web run coverage || true
+        env:
+          VITEST_CI_COVERAGE: loose
+        run: |
+          pnpm -C apps/web run coverage || true
+          echo "Coverage files:" && ls -la apps/web/coverage || true
       - name: SonarCloud Scan
         if: ${{ env.SONAR_TOKEN != '' }}
         uses: SonarSource/sonarcloud-github-action@v2

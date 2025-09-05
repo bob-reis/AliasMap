@@ -28,7 +28,26 @@ export interface SiteSpec {
 }
 
 export interface Evidence {
-  kind: 'pattern' | 'canonical' | 'og:url' | 'final_url' | 'username-text';
+  kind: 
+    | 'pattern' 
+    | 'canonical' 
+    | 'og:url' 
+    | 'final_url' 
+    | 'username-text'
+    | 'validation_canonical'
+    | 'validation_og_title'
+    | 'validation_og_url'
+    | 'validation_profile_image'
+    | 'validation_schema'
+    | 'validation_username_mentions'
+    | 'validation_head_200'
+    | 'validation_head_404'
+    | 'validation_redirect_notfound'
+    | 'validation_redirect_username'
+    | 'validation_content_type'
+    | 'validation_server'
+    | 'validation_cache'
+    | 'validation_json_api';
   value: string; // supporting evidence for classification
 }
 
