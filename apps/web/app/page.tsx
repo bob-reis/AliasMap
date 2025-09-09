@@ -1,159 +1,185 @@
-'use client';
+"use client";
 
-import { useMemo, useState } from 'react';
-import Link from 'next/link';
-import { EthicsBanner } from '../components/EthicsBanner';
-import { buildMindmap } from '../lib/mindmap';
-import { platformLabel } from '../lib/platforms';
-import { MindmapPreview } from '../components/MindmapPreview';
+import * as React from "react";
+import Image from "next/image";
+import logo from "./icon.svg";
+import { Box, Container, Paper, Stack, Typography, IconButton, Tooltip } from "@mui/material";
+import RestartAltIcon from "@mui/icons-material/RestartAlt";
+import GavelIcon from "@mui/icons-material/Gavel";
+import SearchScreen from "@/components/SearchScreen";
+import Loading from "@/components/LoadingScreen";
+import ResultsScreen from "@/components/ResultsScreen";
+import EthicsPage from "@/components/EthicsPage";
+import type { SiteEvent, Status, MindmapItem } from "../types";
 
-type SiteEvent =
-  | { type: 'site_start'; id: string }
-  | { type: 'site_result'; id: string; status: string; url?: string; latencyMs?: number; reason?: string; evidence?: { kind: string; value: string }[]; heuristic?: boolean }
-  | { type: 'site_error'; id: string; reason: string }
-  | { type: 'progress'; done: number; total: number }
-  | { type: 'done'; summary: { done: number; total: number } };
+const normalizeStatus = (s: string): Status => {
+  const v = s.toLowerCase();
+  if (v.includes("found") || v === "200") return "found";
+  if (v.includes("not") || v === "404") return "not_found";
+  if (v.includes("timeout") || v.includes("error")) return "inconclusive";
+  return s as Status;
+};
 
-export default function Home() {
-  const [username, setUsername] = useState('');
-  const [events, setEvents] = useState<SiteEvent[]>([]);
-  const [running, setRunning] = useState(false);
-  // Show only truly found; do not coerce 'inconclusive' to 'found'
+export default function HomeStepsSimple() {
+  const [step, setStep] = React.useState<0 | 1 | 2 | 3>(0);
+  const [username, setUsername] = React.useState("");
+  const [running, setRunning] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const [events, setEvents] = React.useState<SiteEvent[]>([]);
+  const [progress, setProgress] = React.useState<{ done: number; total: number }>({
+    done: 0,
+    total: 0,
+  });
+  const esRef = React.useRef<EventSource | null>(null);
 
-  const canStart = useMemo(() => {
-    return !running && username.trim().length > 0;
-  }, [running, username]);
-
-  const identityStatus = (s: string) => s;
-
-  // Progress is intentionally hidden from the UI per request.
-
-  const latestByPlatform = useMemo(() => {
-    type SiteResultEvent = Extract<SiteEvent, { type: 'site_result' }>;
-    type UiResult = (SiteResultEvent & { platform: string; rawStatus: SiteResultEvent['status']; heuristic?: boolean }) & {
-      status: 'found' | 'not_found' | 'inconclusive' | string;
-    };
-    const map = new Map<string, UiResult>();
+  const foundOnly: MindmapItem[] = React.useMemo(() => {
+    const latestByPlatform = new Map<string, Extract<SiteEvent, { type: "site_result" }>>();
     for (const e of events) {
-      if (e.type === 'site_result') {
-        const label = platformLabel(e.id);
-        map.set(e.id, { ...e, rawStatus: e.status, status: identityStatus(e.status), platform: label });
-      }
+      if (e.type === "site_result") latestByPlatform.set(e.id, e);
     }
-    return Array.from(map.values());
+    return Array.from(latestByPlatform.values())
+      .filter((e) => normalizeStatus(e.status) === "found")
+      .map((e) => ({
+        platform: e.id,
+        status: "found" as Status,
+        rawStatus: e.status as Status,
+        heuristic: e.heuristic,
+        url: e.url,
+      }));
   }, [events]);
 
-  const startScan = () => {
-    if (!username) return;
+  const hasData = foundOnly.length > 0;
+
+  const startScan = (name: string) => {
+    if (!name) return;
+    const isValid = /^[a-zA-Z0-9._-]{3,32}$/.test(name);
+    if (!isValid) {
+      setError("Username inválido. Use 3–32 caracteres: letras, números, ponto, traço e sublinhado.");
+      return;
+    }
+    const normalizedUsername = name.trim().toLowerCase();
+    setUsername(normalizedUsername);
+
+    if (esRef.current) {
+      esRef.current.close();
+      esRef.current = null;
+    }
+    setStep(1);
     setEvents([]);
+    setError(null);
+    setProgress({ done: 0, total: 0 });
     setRunning(true);
-    const es = new EventSource(`/api/scan?username=${encodeURIComponent(username)}&tier=all`);
+
+    const es = new EventSource(`/api/scan?username=${encodeURIComponent(normalizedUsername)}&tier=all`);
+    esRef.current = es;
 
     es.onmessage = (msg) => {
       try {
         const data = JSON.parse(msg.data) as SiteEvent;
-        setEvents(prev => [...prev, data]);
-        if (data.type === 'done') {
-          es.close();
-          setRunning(false);
+        setEvents((prev) => [...prev, data]);
+        if (data.type === "progress") {
+          setProgress({ done: data.done, total: data.total });
         }
-      } catch (e) {
-        // ignore parse errors in stub
+
+        if (data.type === "done") {
+          es.close();
+          esRef.current = null;
+          setRunning(false);
+          setStep(2);
+        }
+      } catch (error) {
+        console.error("Erro ao processar evento SSE:", error);
       }
     };
 
     es.onerror = () => {
       es.close();
+      esRef.current = null;
       setRunning(false);
+      setError("Falha na conexão de varredura (SSE). Tente novamente.");
     };
   };
 
-  const exportJson = () => {
-    const mindmap = buildMindmap(username, events);
-    const header = {
-      tool: 'AliasMap',
-      note:
-        'Dados coletados de fontes públicas. Uso responsável. Nenhuma persistência no servidor. Consulte o Aviso e Uso Ético.'
-    };
-    const payload = { header, username, events, mindmap };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `aliasmap-${username || 'resultado'}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+  const resetAll = () => {
+    setStep(0);
+    setUsername("");
+    setEvents([]);
+    setError(null);
+    setProgress({ done: 0, total: 0 });
+    setRunning(false);
   };
 
-  const exportCsv = () => {
-    const header = 'tool=AliasMap;note=Dados coletados de fontes públicas; etica=/ethics\n';
-    const rows = [['platform', 'status', 'url', 'latencyMs', 'reason', 'heuristic']];
-    for (const e of events) {
-      if (e.type === 'site_result') {
-        const st = e.status;
-        rows.push([
-          e.id,
-          st,
-          e.url ?? '',
-          String(e.latencyMs ?? ''),
-          e.reason ?? '',
-          e.heuristic ? 'yes' : ''
-        ]);
-      }
-    }
-    const csv = header + rows.map(r => r.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = `aliasmap-${username || 'resultado'}.csv`; a.click();
-    URL.revokeObjectURL(url);
+  const handleEthicsClick = () => {
+    setStep(3);
   };
 
   return (
-    <div>
-      <EthicsBanner />
-      <h1>AliasMap</h1>
-      <p>Mapeie possíveis perfis por username em plataformas públicas. Coleta ética e sem persistência.</p>
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12 }}>
-        <input
-          placeholder="username"
-          value={username}
-          onChange={e => setUsername(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter' && canStart) startScan(); }}
-          disabled={running}
-          style={{ padding: 8, border: '1px solid #d1d5db', borderRadius: 6 }}
-        />
-        <button onClick={startScan} disabled={!canStart} style={{ padding: '8px 12px' }}>
-          {running ? 'Executando…' : 'Iniciar varredura'}
-        </button>
-        <button onClick={exportCsv} disabled={!events.length} style={{ padding: '8px 12px' }}>
-          Exportar CSV
-        </button>
-        <button onClick={exportJson} disabled={!events.length} style={{ padding: '8px 12px' }}>
-          Exportar JSON
-        </button>
-        <Link href="/ethics" style={{ marginLeft: 'auto' }}>Aviso e Uso Ético</Link>
-      </div>
+    <Box
+      sx={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <Container
+        maxWidth="md"
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="space-between"
+          sx={{ width: "100%", p: { xs: 2, md: 3 } }}
+        >
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <Image src={logo} alt="AliasMap logo" width={32} height={32} style={{ borderRadius: 6 }} />
+            <Typography variant="h5" fontWeight={800}>
+              AliasMap
+            </Typography>
+          </Stack>
 
-      {/* Progress hidden */}
+          {step > 0 && (
+            <Tooltip title="Reiniciar">
+              <IconButton onClick={resetAll}>
+                <RestartAltIcon />
+              </IconButton>
+            </Tooltip>
+          )}
 
-      {running ? (
-        <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span aria-hidden>⏳</span>
-          <span>Varredura em andamento…</span>
-        </div>
-      ) : null}
+          {step === 0 && (
+            <Tooltip title="Aviso e Uso Ético">
+              <IconButton onClick={handleEthicsClick}>
+                <GavelIcon />
+              </IconButton>
+            </Tooltip>
+          )}
+        </Stack>
 
-      <section style={{ marginTop: 24 }}>
-        <h2>Mindmap (pré-visualização)</h2>
-        {/* Filter removed: always showing only found results */}
-        <div style={{ marginTop: 12 }}>
-          <MindmapPreview
-            username={username}
-            items={latestByPlatform.filter(e => e.status === 'found')}
-          />
-        </div>
-      </section>
-    </div>
+        <Paper
+          variant="outlined"
+          sx={{
+            p: { xs: 2, md: 3 },
+            borderRadius: 3,
+            border: "none",
+            boxShadow: "none",
+            backgroundColor: "transparent",
+            width: "100%",
+          }}
+        >
+          {step === 0 && <SearchScreen onStart={startScan} loading={running} />}
+          {step === 1 && <Loading progress={progress} error={error || undefined} />}
+          {step === 2 && (
+            <ResultsScreen hasData={hasData} trimmed={username.trim()} foundOnly={foundOnly} events={events} />
+          )}
+          {step === 3 && <EthicsPage />}
+        </Paper>
+      </Container>
+    </Box>
   );
 }
