@@ -1,88 +1,435 @@
-import React, { useMemo } from 'react';
+"use client";
 
-type Item = {
-  platform: string;
-  status: 'found' | 'not_found' | 'inconclusive' | string;
-  rawStatus?: 'found' | 'not_found' | 'inconclusive' | string;
-  heuristic?: boolean;
-  url?: string;
-};
+import * as React from "react";
+import { ExternalLink, Info, Dot, ShieldCheck } from "lucide-react";
+import {
+  Card,
+  CardHeader,
+  CardContent,
+  Divider,
+  Box,
+  Stack,
+  Typography,
+  Chip,
+  Tooltip,
+  useTheme,
+  Button,
+} from "@mui/material";
+import DownloadIcon from "@mui/icons-material/Download";
+import type { MindmapPreviewProps, EdgeProps, LegendProps, SiteEvent } from "../types";
 
-export function MindmapPreview({ username, items }: { username: string; items: Item[] }) {
-  const width = 600;
-  const height = 420;
-  const cx = width / 2;
-  const cy = height / 2;
-  const radius = 140;
+/* ===== Constantes/Utils ===== */
+const STATUS_COLORS = {
+  found: "#10B981",
+  inconclusive: "#F59E0B",
+  not_found: "#9CA3AF",
+  unknown: "#EF4444",
+} as const;
 
-  const nodes = useMemo(() => {
+const NODE_R = 20;
+const CORE_R = 34;
+
+function colorFor(status: string): string {
+  if (status === "found") return STATUS_COLORS.found;
+  if (status === "inconclusive") return STATUS_COLORS.inconclusive;
+  if (status === "not_found") return STATUS_COLORS.not_found;
+  return STATUS_COLORS.unknown;
+}
+
+function isSafeHttpUrl(u?: string): u is string {
+  if (!u) return false;
+  try {
+    const url = new URL(u);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function truncate(s: string, max = 12) {
+  return s.length > max ? s.slice(0, max - 1) + "…" : s;
+}
+
+function useMeasure<T extends HTMLElement>() {
+  const ref = React.useRef<T | null>(null);
+  const [rect, setRect] = React.useState<{ width: number; height: number }>({ width: 640, height: 420 });
+
+  React.useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      for (const e of entries) {
+        const cr = e.contentRect;
+        setRect({ width: Math.max(320, cr.width), height: Math.max(280, cr.height) });
+      }
+    });
+    ro.observe(el);
+    const r = el.getBoundingClientRect();
+    setRect({ width: Math.max(320, r.width), height: Math.max(280, r.height) });
+    return () => ro.disconnect();
+  }, []);
+
+  return { ref, rect };
+}
+
+export function MindmapPreview({
+  username,
+  items,
+  width,
+  height,
+  radius = 150,
+  className,
+  maxLabel = 12,
+  events,
+  exportData = true,
+}: MindmapPreviewProps) {
+  const theme = useTheme();
+  const prefersReduced =
+    typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+
+  const { ref, rect } = useMeasure<HTMLDivElement>();
+  const idPrefix = React.useId();
+  const W = width ?? rect.width;
+  const H = height ?? rect.height;
+  const cx = W / 2;
+  const cy = H / 2;
+  const effectiveRadius = Math.max(80, Math.min(radius, Math.min(W, H) * 0.42 - 10));
+  const nodes = React.useMemo(() => {
     const N = Math.max(1, items.length);
     return items.map((it, i) => {
       const angle = (i / N) * Math.PI * 2 - Math.PI / 2;
-      const x = cx + radius * Math.cos(angle);
-      const y = cy + radius * Math.sin(angle);
-      return { ...it, x, y };
+      const x = cx + effectiveRadius * Math.cos(angle);
+      const y = cy + effectiveRadius * Math.sin(angle);
+      return { ...it, x, y, angle, safeUrl: isSafeHttpUrl(it.url) ? it.url : undefined };
     });
-  }, [items, cx, cy, radius]);
+  }, [items, cx, cy, effectiveRadius]);
 
-  const colorFor = (status: string) => {
-    if (status === 'found') return '#10B981'; // green
-    if (status === 'inconclusive') return '#F59E0B'; // amber
-    if (status === 'not_found') return '#9CA3AF'; // gray
-    return '#EF4444'; // red for errors/unknown
-  };
+  const gradCoreId = `${idPrefix}-mm-core`;
+  const shadowId = `${idPrefix}-mm-shadow`;
+  const ariaLabel = `Mapa de evidências para ${username || "alvo"} com ${items.length} plataformas`;
+
+  function exportJson(username: string, events: SiteEvent[]) {
+    const payload = { username, events };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `aliasmap-${username || "resultado"}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function exportCsv(username: string, events: SiteEvent[]) {
+    const header = `user=${username}\n`;
+    const rows = [["platform", "status", "url"]];
+    for (const e of events) {
+      if (e.type === "site_result") {
+        rows.push([e.id, e.status, e.url ?? ""]);
+      }
+    }
+    const csv = header + rows.map((r) => r.map((v) => `"${v}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `aliasmap-${username || "resultado"}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  if (!items || items.length === 0) {
+    return (
+      <Card className={className} sx={{ border: "none", backgroundColor: "transparent" }}>
+        <CardHeader
+          title={
+            <Stack direction="row" alignItems="center" spacing={1.5}>
+              <Box
+                sx={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 36, height: 36 }}
+              >
+                <ShieldCheck size={18} />
+              </Box>
+              <Typography variant="subtitle1" fontWeight={600}>
+                Mapa de Evidências
+              </Typography>
+            </Stack>
+          }
+          subheader={
+            <Typography variant="caption" color="text.secondary">
+              Sem dados para exibir
+            </Typography>
+          }
+        />
+      </Card>
+    );
+  }
 
   return (
-    <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden' }}>
-      <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Mindmap preview">
-        <defs>
-          <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-            <feDropShadow dx="0" dy="2" stdDeviation="2" floodColor="#000" floodOpacity="0.2" />
-          </filter>
-        </defs>
+    <Card
+      className={className}
+      sx={{
+        width: "100%",
+        height: "100%",
+        display: "block",
+        overflow: "hidden",
+        backdropFilter: "blur(4px)",
+        backgroundColor: "transparent",
+        border: "none",
+      }}
+    >
+      <CardHeader
+        title={
+          <Stack direction="row" alignItems="center" spacing={1.5}>
+            <Box sx={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 36, height: 36 }}>
+              <ShieldCheck size={18} />
+            </Box>
+            <Box>
+              <Typography variant="subtitle1" fontWeight={600} lineHeight={1.25}>
+                Mapa de Evidências
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {username || "alvo"} — {items.length} plataformas
+              </Typography>
+            </Box>
+          </Stack>
+        }
+        action={
+          <Tooltip
+            arrow
+            title={
+              <Box sx={{ fontSize: 12, maxWidth: 300 }}>
+                Cada nó representa uma plataforma. Cores indicam o status. Tracejado = heurístico. Clique/Enter abre a
+                URL quando disponível.
+              </Box>
+            }
+          >
+            <Stack direction="row" spacing={0.5} alignItems="center" sx={{ color: "text.secondary", cursor: "help" }}>
+              <Info size={18} />
+              <Typography variant="caption">Ajuda</Typography>
+            </Stack>
+          </Tooltip>
+        }
+        sx={{ pb: 1.5 }}
+      />
 
-        {/* Root node */}
-        <circle cx={cx} cy={cy} r={34} fill="#111827" stroke="#2563EB" strokeWidth={2} filter="url(#shadow)" />
-        <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle" fill="#F9FAFB" fontSize={12}>
-          {username || 'alvo'}
-        </text>
+      <Divider />
 
-        {/* Edges */}
-        {nodes.map((n) => (
-          <line key={`edge-${n.platform}`} x1={cx} y1={cy} x2={n.x} y2={n.y} stroke="#D1D5DB" strokeWidth={1} />
-        ))}
+      <CardContent sx={{ pt: 2 }}>
+        <Stack direction="row" spacing={1} flexWrap="wrap" mb={2}>
+          <Legend label="Encontrado" color={STATUS_COLORS.found} />
+          <Legend label="Inconclusivo" color={STATUS_COLORS.inconclusive} />
+          <Legend label="Não encontrado" color={STATUS_COLORS.not_found} />
+          <Legend label="Erro/Desconhecido" color={STATUS_COLORS.unknown} />
+        </Stack>
+        <Box ref={ref} sx={{ width: "100%", height: { xs: 320, sm: 380, md: 420 }, position: "relative" }}>
+          <svg
+            width="100%"
+            height="100%"
+            viewBox={`0 0 ${W} ${H}`}
+            aria-label={ariaLabel}
+            style={{ userSelect: "none", display: "block" }}
+          >
+            <title>{ariaLabel}</title>
+            <desc>Visual de nós por plataforma conectados ao identificador central.</desc>
 
-        {/* Platform nodes */}
-        {nodes.map((n) => {
-          const content = (
-            <g key={n.platform}>
-              <circle
-                cx={n.x}
-                cy={n.y}
-                r={20}
-                fill="#FFFFFF"
-                stroke={colorFor(n.rawStatus ?? n.status)}
-                strokeWidth={2}
-                filter="url(#shadow)"
-                strokeDasharray={n.heuristic ? '4 3' : undefined}
-              />
-              <text x={n.x} y={n.y} textAnchor="middle" dominantBaseline="middle" fill="#111827" fontSize={11}>
-                {n.platform}
+            <defs>
+              <filter id={shadowId} x="-20%" y="-20%" width="140%" height="140%">
+                <feDropShadow dx="0" dy="2" stdDeviation="2" floodColor="#000" floodOpacity="0.18" />
+              </filter>
+
+              <radialGradient id={gradCoreId} cx="50%" cy="50%" r="70%">
+                <stop offset="0%" stopColor={theme.palette.primary.main} stopOpacity="0.18" />
+                <stop offset="100%" stopColor={theme.palette.background.paper} stopOpacity="1" />
+              </radialGradient>
+            </defs>
+
+            <circle
+              cx={cx}
+              cy={cy}
+              r={effectiveRadius + 24}
+              fill="none"
+              stroke={`url(#${gradCoreId})`}
+              strokeOpacity="0.25"
+              strokeWidth="1.5"
+              strokeDasharray="3 4"
+            />
+
+            <g filter={`url(#${shadowId})`}>
+              <circle cx={cx} cy={cy} r={CORE_R} fill={`url(#${gradCoreId})`} stroke="#2563EB" strokeWidth={1.5} />
+              <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle" fontSize={12} fill="#F9FAFB">
+                {truncate(username || "alvo", 18)}
               </text>
-              {n.heuristic && (
-                <text x={n.x} y={n.y + 15} textAnchor="middle" fill="#6B7280" fontSize={9}>
-                  heurístico
-                </text>
-              )}
             </g>
-          );
-          return n.url ? (
-            <a key={n.platform} href={n.url} target="_blank" rel="noopener noreferrer">
-              {content}
-            </a>
-          ) : content;
-        })}
-      </svg>
-    </div>
+
+            {nodes.map((n, idx) => (
+              <Edge
+                key={`edge-${idx}-${n.platform}`}
+                idx={idx}
+                x1={cx}
+                y1={cy}
+                x2={n.x}
+                y2={n.y}
+                animate={!prefersReduced}
+                prefix={idPrefix}
+              />
+            ))}
+
+            {/* nós */}
+            {nodes.map((n, idx) => {
+              const stroke = colorFor(n.rawStatus ?? n.status);
+              const isHeuristic = Boolean(n.heuristic);
+              const label = truncate(n.platform, maxLabel);
+
+              const group = (
+                <g
+                  key={`node-${idx}-${n.platform}`}
+                  filter={`url(#${shadowId})`}
+                  tabIndex={n.safeUrl ? 0 : -1}
+                  role={n.safeUrl ? "link" : "group"}
+                  aria-label={`${n.platform}: ${n.rawStatus ?? n.status}${isHeuristic ? " (heurístico)" : ""}`}
+                  onKeyDown={(e) => {
+                    if (!n.safeUrl) return;
+                    if (e.key === "Enter" || e.key === " ") {
+                      window.open(n.safeUrl, "_blank", "noopener,noreferrer");
+                      e.preventDefault();
+                    }
+                  }}
+                >
+                  <title>
+                    {`${n.platform} — ${n.rawStatus ?? n.status}${isHeuristic ? " (heurístico)" : ""}${
+                      n.safeUrl ? ` — ${n.safeUrl}` : ""
+                    }`}
+                  </title>
+                  <circle
+                    cx={n.x}
+                    cy={n.y}
+                    r={NODE_R}
+                    fill={theme.palette.background.paper}
+                    stroke={stroke}
+                    strokeWidth={2}
+                    strokeDasharray={isHeuristic ? "4 3" : undefined}
+                  />
+                  <text
+                    x={n.x}
+                    y={n.y}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    fontSize={11}
+                    fill={theme.palette.text.primary}
+                  >
+                    {label}
+                  </text>
+                  {isHeuristic && (
+                    <text x={n.x} y={n.y + 16} textAnchor="middle" fontSize={9} fill="#6B7280">
+                      heurístico
+                    </text>
+                  )}
+                </g>
+              );
+
+              if (!n.safeUrl) return group;
+
+              return (
+                <Tooltip
+                  key={`tt-${idx}-${n.platform}`}
+                  arrow
+                  enterDelay={80}
+                  componentsProps={{ tooltip: { sx: { p: 1.5, maxWidth: 320 } } }}
+                  title={
+                    <Stack spacing={0.5} fontSize={12}>
+                      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                        <Dot size={16} style={{ color: stroke }} />
+                        <Typography fontWeight={600} component="span">
+                          {n.platform}
+                        </Typography>
+                        <Chip
+                          size="small"
+                          variant="outlined"
+                          label={n.rawStatus ?? n.status}
+                          sx={{ height: 20, "& .MuiChip-label": { px: 0.5, fontSize: 10 } }}
+                        />
+                        {isHeuristic && (
+                          <Chip
+                            size="small"
+                            color="secondary"
+                            variant="outlined"
+                            label="heurístico"
+                            sx={{ height: 20, "& .MuiChip-label": { px: 0.5, fontSize: 10 } }}
+                          />
+                        )}
+                      </Stack>
+                      <Typography color="text.secondary" noWrap>
+                        {n.safeUrl}
+                      </Typography>
+                      <Stack direction="row" alignItems="center" spacing={0.5} color="primary.main">
+                        <ExternalLink size={14} />
+                        <Typography component="span">Abrir</Typography>
+                      </Stack>
+                    </Stack>
+                  }
+                >
+                  <a href={n.safeUrl} target="_blank" rel="noopener noreferrer" tabIndex={-1}>
+                    {group}
+                  </a>
+                </Tooltip>
+              );
+            })}
+          </svg>
+        </Box>
+        {exportData && (
+          <Stack direction="row" spacing={1} justifyContent="flex-end">
+            <Button
+              variant="contained"
+              startIcon={<DownloadIcon />}
+              disabled={!events.length}
+              onClick={() => exportCsv(username, events)}
+            >
+              CSV
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<DownloadIcon />}
+              disabled={!events.length}
+              onClick={() => exportJson(username, events)}
+            >
+              JSON
+            </Button>
+          </Stack>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function Edge({ idx, x1, y1, x2, y2, animate, prefix }: EdgeProps) {
+  const gradId = `${prefix}-edge-grad-${idx}`;
+  return (
+    <g>
+      <linearGradient id={gradId}>
+        <stop offset="0%" stopColor="#D1D5DB" stopOpacity="0.7" />
+        <stop offset="100%" stopColor="#D1D5DB" stopOpacity="0.15" />
+      </linearGradient>
+      <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={`url(#${gradId})`} strokeWidth={1.25}>
+        {animate ? (
+          <animate attributeName="stroke-opacity" values="0.35;0.75;0.35" dur="2.4s" repeatCount="indefinite" />
+        ) : null}
+      </line>
+    </g>
+  );
+}
+
+function Legend({ label, color }: LegendProps) {
+  return (
+    <Chip
+      variant="outlined"
+      label={
+        <Stack direction="row" spacing={1} alignItems="center">
+          <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: color }} />
+          <span>{label}</span>
+        </Stack>
+      }
+      sx={{ "& .MuiChip-label": { display: "flex", alignItems: "center", py: 0.5, px: 1 } }}
+    />
   );
 }

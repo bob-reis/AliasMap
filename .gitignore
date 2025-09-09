@@ -17,3 +17,6 @@ dist/
 build/
 .vercel/
 .cache/
+
+# Build
+apps/web/.next/
