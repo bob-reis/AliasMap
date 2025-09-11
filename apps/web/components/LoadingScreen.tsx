@@ -13,7 +13,7 @@ export default function LoadingScreen({ progress, error }: LoadingProps) {
       <LinearProgress
         variant="determinate"
         value={progress.total ? (progress.done / progress.total) * 100 : 0}
-        color={error ? "error" : "info"}
+        color={error ? "error" : "secondary"}
         sx={{ width: "60%" }}
       />
 

@@ -5,7 +5,11 @@ import { createTheme, ThemeProvider, CssBaseline } from "@mui/material";
 import type { NodeProps } from "../types";
 
 const LIGHT = {
-  primary: { main: "#0B1B34", light: "#4A90E2", dark: "#003B5C" },
+  primary: { 
+    main: "#00ff41", 
+    light: "#41d165ff",
+    dark: "#006118ff"
+  },
   secondary: { main: "#16C5C0" },
   background: { default: "#f0f0f0", paper: "#FFFFFF" },
   text: { primary: "#0B1B34", secondary: "#374151" },
@@ -16,10 +20,15 @@ const LIGHT = {
   unknown: "#EF4444",
 } as const;
 
+
 const DARK = {
-  primary: { main: "#0D2D3A", light: "#4A90E2", dark: "#003B5C" },
+  primary: {
+    main: "#00ff41",
+    light: "#41d165ff",
+    dark: "#006118ff",
+  },
   secondary: { main: "#F9FAFB" },
-  background: { default: "#0B1B34", paper: "#111827" },
+  background: { default: "#010409e6", paper: "#010409e6" },
   text: { primary: "#FFFFFF", secondary: "#9CA3AF" },
   error: { main: "#EF4444" },
   found: "#10B981",
