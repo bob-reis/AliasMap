@@ -23,6 +23,7 @@ const STATUS_COLORS = {
   found: "#10B981",
   inconclusive: "#F59E0B",
   not_found: "#9CA3AF",
+  error: "#EF4444",
   unknown: "#EF4444",
 } as const;
 
@@ -33,6 +34,7 @@ function colorFor(status: string): string {
   if (status === "found") return STATUS_COLORS.found;
   if (status === "inconclusive") return STATUS_COLORS.inconclusive;
   if (status === "not_found") return STATUS_COLORS.not_found;
+  if (status === "error") return STATUS_COLORS.error;
   return STATUS_COLORS.unknown;
 }
 
@@ -217,10 +219,13 @@ export function MindmapPreview({
 
       <CardContent sx={{ pt: 2 }}>
         <Stack direction="row" spacing={1} flexWrap="wrap" mb={2}>
-          <Legend label="Encontrado" color={STATUS_COLORS.found} />
-          <Legend label="Inconclusivo" color={STATUS_COLORS.inconclusive} />
-          <Legend label="Não encontrado" color={STATUS_COLORS.not_found} />
-          <Legend label="Erro/Desconhecido" color={STATUS_COLORS.unknown} />
+          {Array.from(new Set(items.map((i) => i.status))).map((s) => {
+            if (s === "found") return <Legend key={s} label="Encontrado" color={STATUS_COLORS.found} />;
+            if (s === "inconclusive") return <Legend key={s} label="Inconclusivo" color={STATUS_COLORS.inconclusive} />;
+            if (s === "not_found") return <Legend key={s} label="Não encontrado" color={STATUS_COLORS.not_found} />;
+            if (s === "error") return <Legend key={s} label="Erro" color={STATUS_COLORS.error} />;
+            return null;
+          })}
         </Stack>
         <Box ref={ref} sx={{ width: "100%", height: { xs: 320, sm: 380, md: 420 }, position: "relative" }}>
           <svg
@@ -277,7 +282,7 @@ export function MindmapPreview({
 
             {/* nós */}
             {nodes.map((n, idx) => {
-              const stroke = colorFor(n.rawStatus ?? n.status);
+              const stroke = colorFor(n.status);
               const isHeuristic = Boolean(n.heuristic);
               const label = truncate(n.platform, maxLabel);
 

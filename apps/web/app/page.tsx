@@ -13,11 +13,12 @@ import EthicsPage from "@/components/EthicsPage";
 import type { SiteEvent, Status, MindmapItem } from "../types";
 
 const normalizeStatus = (s: string): Status => {
-  const v = s.toLowerCase();
+  const v = String(s).toLowerCase();
   if (v.includes("found") || v === "200") return "found";
   if (v.includes("not") || v === "404") return "not_found";
-  if (v.includes("timeout") || v.includes("error")) return "inconclusive";
-  return s as Status;
+  if (v.includes("timeout") || v.includes("error")) return "error";
+  if (v === "403" || v.includes("block")) return "inconclusive";
+  return "inconclusive";
 };
 
 export default function HomeStepsSimple() {
@@ -32,23 +33,28 @@ export default function HomeStepsSimple() {
   });
   const esRef = React.useRef<EventSource | null>(null);
 
-  const foundOnly: MindmapItem[] = React.useMemo(() => {
+  const latestByPlatform = React.useMemo(() => {
     const latestByPlatform = new Map<string, Extract<SiteEvent, { type: "site_result" }>>();
     for (const e of events) {
       if (e.type === "site_result") latestByPlatform.set(e.id, e);
     }
-    return Array.from(latestByPlatform.values())
-      .filter((e) => normalizeStatus(e.status) === "found")
-      .map((e) => ({
-        platform: e.id,
-        status: "found" as Status,
-        rawStatus: e.status as Status,
-        heuristic: e.heuristic,
-        url: e.url,
-      }));
+    return latestByPlatform;
   }, [events]);
 
-  const hasData = foundOnly.length > 0;
+  const itemsAll: MindmapItem[] = React.useMemo(() => {
+    return Array.from(latestByPlatform.values()).map((e) => ({
+      platform: e.id,
+      status: normalizeStatus(e.status) as Status,
+      rawStatus: e.status,
+      heuristic: e.heuristic,
+      url: e.url,
+    }));
+  }, [latestByPlatform]);
+
+  const itemsFocus: MindmapItem[] = React.useMemo(
+    () => itemsAll.filter((i) => i.status === "found" || i.status === "inconclusive"),
+    [itemsAll]
+  );
 
   const startScan = (name: string) => {
     if (!name) return;
@@ -175,7 +181,7 @@ export default function HomeStepsSimple() {
           {step === 0 && <SearchScreen onStart={startScan} loading={running} />}
           {step === 1 && <Loading progress={progress} error={error || undefined} />}
           {step === 2 && (
-            <ResultsScreen hasData={hasData} trimmed={username.trim()} foundOnly={foundOnly} events={events} />
+            <ResultsScreen trimmed={username.trim()} itemsFocus={itemsFocus} itemsAll={itemsAll} events={events} />
           )}
           {step === 3 && <EthicsPage />}
         </Paper>

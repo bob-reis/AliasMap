@@ -29,12 +29,12 @@ export type EdgeProps = Readonly<{
   prefix: string;
 }>;
 
-export type Status = "found" | "not_found" | "inconclusive";
+export type Status = "found" | "not_found" | "inconclusive" | "error";
 
 export type MindmapItem = Readonly<{
   platform: string;
   status: Status;
-  rawStatus?: Status;
+  rawStatus?: string;
   heuristic?: boolean;
   url?: string;
 }>;
@@ -66,11 +66,13 @@ export type SiteEvent =
   | { type: "progress"; done: number; total: number }
   | { type: "done"; summary: { done: number; total: number } };
 
+export type ResultsFilter = "focus" | "all" | "found" | "inconclusive" | "not_found" | "error";
+
 export type ResultsScreenProps = Readonly<{
   events: SiteEvent[];
-  hasData: boolean;
   trimmed: string;
-  foundOnly: MindmapItem[];
+  itemsFocus: MindmapItem[];
+  itemsAll: MindmapItem[];
 }>;
 
 export type SearchScreenProps = Readonly<{
