@@ -1,5 +1,6 @@
 import { CORE_SITES } from './sites.core';
 import type { SiteResult, SiteSpec, Evidence, Tier } from './types';
+import { extractMeta } from './meta';
 import { INFOOOZE_URLS } from './sites.infoooze';
 import { canonicalPlatformIdFromUrl } from './platforms';
 
@@ -148,7 +149,8 @@ async function checkSite(site: SiteSpec, username: string): Promise<SiteResult> 
         if (canonicalOk && canonical) evidence.push({ kind: 'canonical', value: canonical });
         if (ogOk && ogUrl) evidence.push({ kind: 'og:url', value: ogUrl });
         if (!evidence.length) evidence.push({ kind: 'username-text', value: (u ?? username) });
-        return { id: site.id, status: 'found', url, latencyMs: Date.now() - start, evidence };
+        const metadata = extractMeta(body, expectedUrl);
+        return { id: site.id, status: 'found', url, latencyMs: Date.now() - start, evidence, metadata };
       }
       if (matchedNotFound) {
         return { id: site.id, status: 'not_found', url, latencyMs: Date.now() - start, evidence: [{ kind: 'pattern', value: matchedNotFound }] };
@@ -165,7 +167,7 @@ async function checkSite(site: SiteSpec, username: string): Promise<SiteResult> 
           status: 'found',
           url,
           latencyMs: Date.now() - start,
-          evidence: [{ kind: 'pattern', value: matchedNotFound }]
+          evidence: [{ kind: 'pattern', value: matchedNotFound }],
         };
       }
     }
@@ -176,7 +178,8 @@ async function checkSite(site: SiteSpec, username: string): Promise<SiteResult> 
       if (!matchedNotFound && suspended) {
         const evidence: Evidence[] = [{ kind: 'pattern', value: 'Account suspended' }];
         if (canonicalOk && canonical) evidence.push({ kind: 'canonical', value: canonical });
-        return { id: site.id, status: 'found', url, latencyMs: Date.now() - start, evidence };
+        const metadata = extractMeta(body, url);
+        return { id: site.id, status: 'found', url, latencyMs: Date.now() - start, evidence, metadata };
       }
     }
 
@@ -187,7 +190,8 @@ async function checkSite(site: SiteSpec, username: string): Promise<SiteResult> 
       if (ogOk && ogUrl) evidence.push({ kind: 'og:url', value: ogUrl });
       if (finalUrlOk && res.url) evidence.push({ kind: 'final_url', value: res.url });
       if (!evidence.length) evidence.push({ kind: 'username-text', value: (u ?? username) });
-      return { id: site.id, status: 'found', url, latencyMs: Date.now() - start, evidence };
+      const metadata = extractMeta(body, url);
+      return { id: site.id, status: 'found', url, latencyMs: Date.now() - start, evidence, metadata };
     }
 
     if (matchedSuccess && !matchedNotFound && usernameOk && (canonicalOk || ogOk || finalUrlOk)) {
@@ -196,7 +200,8 @@ async function checkSite(site: SiteSpec, username: string): Promise<SiteResult> 
       if (canonicalOk && canonical) evidence.push({ kind: 'canonical', value: canonical });
       if (ogOk && ogUrl) evidence.push({ kind: 'og:url', value: ogUrl });
       if (finalUrlOk && res.url) evidence.push({ kind: 'final_url', value: res.url });
-      return { id: site.id, status: 'found', url, latencyMs: Date.now() - start, evidence };
+      const metadata = extractMeta(body, url);
+      return { id: site.id, status: 'found', url, latencyMs: Date.now() - start, evidence, metadata };
     }
     if (matchedNotFound) {
       return { id: site.id, status: 'not_found', url, latencyMs: Date.now() - start, evidence: [{ kind: 'pattern', value: matchedNotFound }] };
@@ -251,7 +256,7 @@ export async function* runScan(opts: ScanOptions) {
     for (const s of batch) yield { type: 'site_start', id: s.id } as const;
     const results = await Promise.all(batch.map(s => checkSite(s, opts.username)));
     for (const r of results) {
-      yield { type: 'site_result', id: r.id, status: r.status, url: r.url, latencyMs: r.latencyMs, reason: r.reason, evidence: r.evidence } as const;
+      yield { type: 'site_result', id: r.id, status: r.status, url: r.url, latencyMs: r.latencyMs, reason: r.reason, evidence: r.evidence, metadata: r.metadata } as const;
       done += 1;
       yield { type: 'progress', done, total: sites.length } as const;
       await sleep(10);
@@ -270,7 +275,7 @@ export async function* runScanWithSites(sites: SiteSpec[], opts: { username: str
     for (const s of batch) yield { type: 'site_start', id: s.id } as const;
     const results = await Promise.all(batch.map(s => checkSite(s, opts.username)));
     for (const r of results) {
-      yield { type: 'site_result', id: r.id, status: r.status, url: r.url, latencyMs: r.latencyMs, reason: r.reason, evidence: r.evidence } as const;
+      yield { type: 'site_result', id: r.id, status: r.status, url: r.url, latencyMs: r.latencyMs, reason: r.reason, evidence: r.evidence, metadata: r.metadata } as const;
       done += 1;
       yield { type: 'progress', done, total: sites.length } as const;
     }

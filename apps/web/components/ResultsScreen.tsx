@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Stack, Typography, Alert, ToggleButtonGroup, ToggleButton, Box, Chip } from "@mui/material";
+import { Stack, Typography, Alert, ToggleButtonGroup, ToggleButton, Box, Chip, FormControlLabel, Switch } from "@mui/material";
 import { MindmapPreview } from "@/components/MindmapPreview";
 import { SideMindmap } from "@/components/SideMindmap";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
@@ -10,6 +10,7 @@ import type { ResultsScreenProps, ResultsFilter, MindmapItem } from "../types";
 export default function ResultsScreen({ trimmed, itemsFocus, itemsAll, events }: ResultsScreenProps) {
   const [filter, setFilter] = React.useState<ResultsFilter>("focus");
   const [layout, setLayout] = React.useState<"lateral" | "radial">("lateral");
+  const [showPreviews, setShowPreviews] = React.useState<boolean>(false);
 
   const items: MindmapItem[] = React.useMemo(() => {
     switch (filter) {
@@ -78,6 +79,13 @@ export default function ResultsScreen({ trimmed, itemsFocus, itemsAll, events }:
             Erro
           </ToggleButton>
           </ToggleButtonGroup>
+
+          {layout === "lateral" && (
+            <FormControlLabel
+              control={<Switch size="small" checked={showPreviews} onChange={(e) => setShowPreviews(e.target.checked)} />}
+              label="Pré‑vias"
+            />
+          )}
         </Stack>
       </Stack>
 
@@ -86,7 +94,7 @@ export default function ResultsScreen({ trimmed, itemsFocus, itemsAll, events }:
           Nenhum item para exibir neste filtro.
         </Alert>
       ) : layout === "lateral" ? (
-        <SideMindmap username={trimmed} items={items} events={events} />
+        <SideMindmap username={trimmed} items={items} events={events} showPreviews={showPreviews} />
       ) : (
         <MindmapPreview username={trimmed} items={items} events={events} />
       )}

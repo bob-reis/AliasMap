@@ -37,6 +37,7 @@ export type MindmapItem = Readonly<{
   rawStatus?: string;
   heuristic?: boolean;
   url?: string;
+  metadata?: { image?: string; title?: string; description?: string };
 }>;
 
 export type MindmapPreviewProps = Readonly<{
@@ -49,6 +50,7 @@ export type MindmapPreviewProps = Readonly<{
   maxLabel?: number;
   events: SiteEvent[];
   exportData?: boolean;
+  showPreviews?: boolean;
 }>;
 
 export type SiteEvent =
@@ -61,6 +63,7 @@ export type SiteEvent =
       latencyMs?: number;
       reason?: string;
       heuristic?: boolean;
+      metadata?: { image?: string; title?: string; description?: string };
     }
   | { type: "site_error"; id: string; reason: string }
   | { type: "progress"; done: number; total: number }

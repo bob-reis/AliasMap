@@ -266,7 +266,7 @@ export function MindmapPreview({
                   enterDelay={80}
                   componentsProps={{ tooltip: { sx: { p: 1.5, maxWidth: 320 } } }}
                   title={
-                    <Stack spacing={0.5} fontSize={12}>
+                    <Stack spacing={0.75} fontSize={12}>
                       <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
                         <Dot size={16} style={{ color: stroke }} />
                         <Typography fontWeight={600} component="span">
@@ -288,6 +288,20 @@ export function MindmapPreview({
                           />
                         )}
                       </Stack>
+                      {n.status === 'found' && (n as any).metadata && (
+                        <Stack spacing={0.25}>
+                          {((n as any).metadata.title as string | undefined) && (
+                            <Typography variant="body2" fontWeight={700}>
+                              {(n as any).metadata.title}
+                            </Typography>
+                          )}
+                          {((n as any).metadata.description as string | undefined) && (
+                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                              {(n as any).metadata.description}
+                            </Typography>
+                          )}
+                        </Stack>
+                      )}
                       <Typography color="text.secondary" noWrap>
                         {n.safeUrl}
                       </Typography>
