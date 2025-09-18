@@ -1,14 +1,14 @@
 "use client";
 
 import * as React from "react";
-import { Box, Card, CardContent, CardHeader, Chip, Divider, Stack, Typography, useTheme } from "@mui/material";
-import { ExternalLink } from "lucide-react";
+import { Box, Card, CardContent, CardHeader, Divider, Stack, Typography, useTheme } from "@mui/material";
 import type { MindmapPreviewProps, MindmapItem, Status } from "../types";
 import LegendChip from "@/components/LegendChip";
 import HelpHint from "@/components/HelpHint";
 import ExportButtons from "@/components/ExportButtons";
-import { STATUS_COLORS, isSafeHttpUrl } from "@/lib/ui";
-import { exportCsv, exportJson } from "@/lib/export";
+import { STATUS_COLORS } from "@/lib/ui";
+import GroupSections from "@/components/GroupSections";
+import ConnectionsOverlay, { type Conn as OverlayConn } from "@/components/ConnectionsOverlay";
 
 
 
@@ -20,7 +20,7 @@ import { exportCsv, exportJson } from "@/lib/export";
 
 
 
-type Conn = { x1: number; y1: number; x2: number; y2: number; color: string; dashed?: boolean };
+type Conn = OverlayConn;
 type GroupKey = Extract<Status, "found" | "inconclusive" | "not_found" | "error">;
 type Group = {
   key: GroupKey;
@@ -146,37 +146,15 @@ export function SideMindmap({ username, items, className, events, exportData = t
         <Box ref={containerRef} sx={{ position: "relative" }}>
           {/* Overlay with connections */}
           <Box sx={{ position: "absolute", inset: 0, zIndex: 0, pointerEvents: "none" }}>
-            <svg width={dims.w} height={dims.h} viewBox={`0 0 ${dims.w} ${dims.h}`}
-              style={{ display: "block", width: "100%", height: "100%" }}>
-              {conns.map((c, i) => {
-                const ctrlX = (c.x1 + c.x2) / 2; // gentle curve
-                const d = `M ${c.x1} ${c.y1} Q ${ctrlX} ${c.y1} ${c.x2} ${c.y2}`;
-                return (
-                  <path key={i} d={d} stroke={c.color} strokeWidth={1.25} fill="none" strokeDasharray={c.dashed ? "4 3" : undefined} strokeOpacity={0.5} />
-                );
-              })}
-            </svg>
+            <ConnectionsOverlay width={dims.w} height={dims.h} conns={conns} />
           </Box>
 
           {/* Content grid over the overlay */}
           <Box sx={{ position: "relative", zIndex: 1, display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr auto 1fr" }, gap: 2, alignItems: "start" }}>
           {/* Coluna esquerda: grupos à esquerda */}
-          <Stack spacing={1.25} sx={{ order: { xs: 2, md: 1 } }}>
-            {groups
-              .filter((g) => g.side === "left" && g.items.length > 0)
-              .map((g) => (
-                <React.Fragment key={`left-${g.key}`}>
-                  <Typography variant="subtitle2" sx={{ mb: 0.5, color: g.color }}>
-                    {g.label}
-                  </Typography>
-                  {g.items.map((i, idx) => (
-                    <div key={`${g.key}-${i.platform}`} ref={(el) => (g.refs.current[idx] = el)}>
-                      <Item item={i} color={g.color} dashed={g.dashed} muted={g.muted} />
-                    </div>
-                  ))}
-                </React.Fragment>
-              ))}
-          </Stack>
+          <Box sx={{ order: { xs: 2, md: 1 } }}>
+            <GroupSections groups={groups.filter((g) => g.side === "left")} />
+          </Box>
 
           {/* Coluna central: núcleo (username) */}
           <Box ref={centerRef} sx={{ order: { xs: 1, md: 2 }, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 120 }}>
@@ -196,22 +174,9 @@ export function SideMindmap({ username, items, className, events, exportData = t
           </Box>
 
           {/* Coluna direita: grupos à direita */}
-          <Stack spacing={1.25} sx={{ order: { xs: 3, md: 3 } }}>
-            {groups
-              .filter((g) => g.side === "right" && g.items.length > 0)
-              .map((g) => (
-                <React.Fragment key={`right-${g.key}`}>
-                  <Typography variant="subtitle2" sx={{ mb: 0.5, color: g.color }}>
-                    {g.label}
-                  </Typography>
-                  {g.items.map((i, idx) => (
-                    <div key={`${g.key}-${i.platform}`} ref={(el) => (g.refs.current[idx] = el)}>
-                      <Item item={i} color={g.color} dashed={g.dashed} muted={g.muted} />
-                    </div>
-                  ))}
-                </React.Fragment>
-              ))}
-          </Stack>
+          <Box sx={{ order: { xs: 3, md: 3 } }}>
+            <GroupSections groups={groups.filter((g) => g.side === "right")} />
+          </Box>
           </Box>
         </Box>
 
@@ -221,60 +186,4 @@ export function SideMindmap({ username, items, className, events, exportData = t
   );
 }
 
-function Item({ item, color, dashed, muted }: { item: MindmapItem; color: string; dashed?: boolean; muted?: boolean }) {
-  const safe = isSafeHttpUrl(item.url);
-  const chip = (
-    <Chip
-      variant={muted ? "outlined" : "filled"}
-      color={muted ? undefined : undefined}
-      label={
-        <Stack direction="row" spacing={1} alignItems="center">
-          <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: color }} />
-          <Typography component="span" fontWeight={600} sx={{ color: "inherit" }}>
-            {item.platform}
-          </Typography>
-          {item.heuristic && (
-            <Chip size="small" variant="outlined" label="heurístico" sx={{ height: 18, "& .MuiChip-label": { px: 0.5, fontSize: 10 } }} />
-          )}
-        </Stack>
-      }
-      sx={{
-        borderColor: color,
-        bgcolor: muted ? "transparent" : undefined,
-        color: "inherit",
-        "& .MuiChip-label": { display: "flex", alignItems: "center", py: 0.5, px: 1 },
-      }}
-    />
-  );
-
-  const content = (
-    <Stack direction="row" spacing={1} alignItems="center" sx={{ position: "relative" }}>
-      <Box
-        sx={{
-          width: 16,
-          height: 1,
-          bgcolor: color,
-          borderTopStyle: dashed ? "dashed" : "solid",
-          borderTopWidth: dashed ? 1 : 0,
-          borderColor: dashed ? color : undefined,
-        }}
-      />
-      {chip}
-      {safe && (
-        <Stack direction="row" alignItems="center" spacing={0.5} color="primary.main">
-          <ExternalLink size={14} />
-          <Typography component="span" sx={{ fontSize: 12 }}>
-            Abrir
-          </Typography>
-        </Stack>
-      )}
-    </Stack>
-  );
-
-  if (!safe) return content;
-  return (
-    <a href={item.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", color: "inherit" }}>
-      {content}
-    </a>
-  );
-}
+// Item moved to separate component to reduce duplication
