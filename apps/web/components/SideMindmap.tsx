@@ -4,80 +4,20 @@ import * as React from "react";
 import { Box, Card, CardContent, CardHeader, Chip, Divider, Stack, Tooltip, Typography, Button, useTheme } from "@mui/material";
 import { Info, ExternalLink } from "lucide-react";
 import DownloadIcon from "@mui/icons-material/Download";
-import type { MindmapPreviewProps, MindmapItem, LegendProps, SiteEvent, Status } from "../types";
+import type { MindmapPreviewProps, MindmapItem, Status } from "../types";
+import LegendChip from "@/components/LegendChip";
+import { STATUS_COLORS, isSafeHttpUrl } from "@/lib/ui";
+import { exportCsv, exportJson } from "@/lib/export";
 
-const STATUS_COLORS = {
-  found: "#10B981",
-  inconclusive: "#F59E0B",
-  not_found: "#9CA3AF",
-  error: "#EF4444",
-  unknown: "#6B7280",
-} as const;
 
-function Legend({ label, color }: LegendProps) {
-  return (
-    <Chip
-      variant="outlined"
-      label={
-        <Stack direction="row" spacing={1} alignItems="center">
-          <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: color }} />
-          <span>{label}</span>
-        </Stack>
-      }
-      sx={{ "& .MuiChip-label": { display: "flex", alignItems: "center", py: 0.5, px: 1 } }}
-    />
-  );
-}
 
-function isSafeHttpUrl(u?: string): u is string {
-  if (!u) return false;
-  try {
-    const url = new URL(u);
-    return url.protocol === "http:" || url.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
 
-function exportJson(username: string, events: SiteEvent[]) {
-  const payload = { username, events };
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `aliasmap-${username || "resultado"}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
 
-function exportCsv(username: string, events: SiteEvent[]) {
-  const header = `user=${username}\n`;
-  const rows = [["platform", "status", "url"]];
-  for (const e of events) {
-    if (e.type === "site_result") {
-      rows.push([e.id, e.status, e.url ?? ""]);
-    }
-  }
-  const csv =
-    header +
-    rows
-      .map((r) =>
-        r
-          .map((c) => {
-            const esc = String(c).replace(/"/g, '""');
-            return `"${esc}"`;
-          })
-          .join(",")
-      )
-      .join("\n");
-  const blob = new Blob([csv], { type: "text/csv" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `aliasmap-${username || "resultado"}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
+
+
+
+
+
 
 type Conn = { x1: number; y1: number; x2: number; y2: number; color: string; dashed?: boolean };
 type GroupKey = Extract<Status, "found" | "inconclusive" | "not_found" | "error">;
@@ -214,7 +154,7 @@ export function SideMindmap({ username, items, className, events, exportData = t
       <CardContent sx={{ pt: 2 }}>
         <Stack direction="row" spacing={1} flexWrap="wrap" mb={2}>
           {groups.filter((g) => g.items.length > 0).map((g) => (
-            <Legend key={g.key} label={g.label} color={g.color} />
+            <LegendChip key={g.key} label={g.label} color={g.color} />
           ))}
         </Stack>
 
