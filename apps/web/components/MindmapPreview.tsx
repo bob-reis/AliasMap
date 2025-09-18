@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { ExternalLink, Dot, ShieldCheck } from "lucide-react";
-import { Card, CardHeader, CardContent, Divider, Box, Stack, Typography, Chip, useTheme } from "@mui/material";
+import { Card, CardHeader, CardContent, Divider, Box, Stack, Typography, Chip, useTheme, Tooltip } from "@mui/material";
 import type { MindmapPreviewProps, EdgeProps, SiteEvent } from "../types";
 import LegendChip from "@/components/LegendChip";
 import { STATUS_COLORS, colorFor, isSafeHttpUrl } from "@/lib/ui";

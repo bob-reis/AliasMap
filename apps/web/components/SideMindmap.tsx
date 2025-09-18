@@ -42,16 +42,14 @@ export function SideMindmap({ username, items, className, events, exportData = t
 
   const containerRef = React.useRef<HTMLDivElement | null>(null);
   const centerRef = React.useRef<HTMLDivElement | null>(null);
-  const refsMap: Record<GroupKey, React.MutableRefObject<(HTMLDivElement | null)[]>> = {
-    found: React.useRef<(HTMLDivElement | null)[]>([]),
-    inconclusive: React.useRef<(HTMLDivElement | null)[]>([]),
-    not_found: React.useRef<(HTMLDivElement | null)[]>([]),
-    error: React.useRef<(HTMLDivElement | null)[]>([]),
-  };
+  const foundRefs = React.useRef<(HTMLDivElement | null)[]>([]);
+  const inconclusiveRefs = React.useRef<(HTMLDivElement | null)[]>([]);
+  const notFoundRefs = React.useRef<(HTMLDivElement | null)[]>([]);
+  const errorRefs = React.useRef<(HTMLDivElement | null)[]>([]);
 
   const groups: Group[] = React.useMemo(
     () => [
-      { key: "found", label: "Encontrado", items: found, color: STATUS_COLORS.found, side: "left", refs: refsMap.found },
+      { key: "found", label: "Encontrado", items: found, color: STATUS_COLORS.found, side: "left", refs: foundRefs },
       {
         key: "inconclusive",
         label: "Inconclusivo",
@@ -59,7 +57,7 @@ export function SideMindmap({ username, items, className, events, exportData = t
         color: STATUS_COLORS.inconclusive,
         side: "right",
         dashed: true,
-        refs: refsMap.inconclusive,
+        refs: inconclusiveRefs,
       },
       {
         key: "not_found",
@@ -68,11 +66,11 @@ export function SideMindmap({ username, items, className, events, exportData = t
         color: STATUS_COLORS.not_found,
         side: "right",
         muted: true,
-        refs: refsMap.not_found,
+        refs: notFoundRefs,
       },
-      { key: "error", label: "Erro", items: errors, color: STATUS_COLORS.error, side: "right", refs: refsMap.error },
+      { key: "error", label: "Erro", items: errors, color: STATUS_COLORS.error, side: "right", refs: errorRefs },
     ],
-    [found, inconclusive, notFound, errors]
+    [found, inconclusive, notFound, errors, foundRefs, inconclusiveRefs, notFoundRefs, errorRefs]
   );
 
   React.useEffect(() => {
