@@ -4,7 +4,7 @@ import * as React from "react";
 import { Box, Card, CardContent, CardHeader, Chip, Divider, Stack, Tooltip, Typography, Button, useTheme } from "@mui/material";
 import { Info, ExternalLink } from "lucide-react";
 import DownloadIcon from "@mui/icons-material/Download";
-import type { MindmapPreviewProps, MindmapItem, LegendProps, SiteEvent } from "../types";
+import type { MindmapPreviewProps, MindmapItem, LegendProps, SiteEvent, Status } from "../types";
 
 const STATUS_COLORS = {
   found: "#10B981",
@@ -80,20 +80,66 @@ function exportCsv(username: string, events: SiteEvent[]) {
 }
 
 type Conn = { x1: number; y1: number; x2: number; y2: number; color: string; dashed?: boolean };
+type GroupKey = Extract<Status, "found" | "inconclusive" | "not_found" | "error">;
+type Group = {
+  key: GroupKey;
+  label: string;
+  items: MindmapItem[];
+  color: string;
+  side: "left" | "right";
+  dashed?: boolean;
+  muted?: boolean;
+  refs: React.MutableRefObject<(HTMLDivElement | null)[]>;
+};
 
 export function SideMindmap({ username, items, className, events, exportData = true }: MindmapPreviewProps) {
   const theme = useTheme();
-  const found = items.filter((i) => i.status === "found");
-  const inconclusive = items.filter((i) => i.status === "inconclusive");
-  const notFound = items.filter((i) => i.status === "not_found");
-  const errors = items.filter((i) => i.status === "error");
+  const found = React.useMemo(() => items.filter((i) => i.status === "found"), [items]);
+  const inconclusive = React.useMemo(() => items.filter((i) => i.status === "inconclusive"), [items]);
+  const notFound = React.useMemo(() => items.filter((i) => i.status === "not_found"), [items]);
+  const errors = React.useMemo(() => items.filter((i) => i.status === "error"), [items]);
 
   const containerRef = React.useRef<HTMLDivElement | null>(null);
   const centerRef = React.useRef<HTMLDivElement | null>(null);
-  const foundRefs = React.useRef<(HTMLDivElement | null)[]>([]);
-  const inconclusiveRefs = React.useRef<(HTMLDivElement | null)[]>([]);
-  const notFoundRefs = React.useRef<(HTMLDivElement | null)[]>([]);
-  const errorRefs = React.useRef<(HTMLDivElement | null)[]>([]);
+  const refsMap: Record<GroupKey, React.MutableRefObject<(HTMLDivElement | null)[]>> = {
+    found: React.useRef<(HTMLDivElement | null)[]>([]),
+    inconclusive: React.useRef<(HTMLDivElement | null)[]>([]),
+    not_found: React.useRef<(HTMLDivElement | null)[]>([]),
+    error: React.useRef<(HTMLDivElement | null)[]>([]),
+  };
+
+  const groups: Group[] = React.useMemo(
+    () => [
+      { key: "found", label: "Encontrado", items: found, color: STATUS_COLORS.found, side: "left", refs: refsMap.found },
+      {
+        key: "inconclusive",
+        label: "Inconclusivo",
+        items: inconclusive,
+        color: STATUS_COLORS.inconclusive,
+        side: "right",
+        dashed: true,
+        refs: refsMap.inconclusive,
+      },
+      {
+        key: "not_found",
+        label: "Não encontrado",
+        items: notFound,
+        color: STATUS_COLORS.not_found,
+        side: "right",
+        muted: true,
+        refs: refsMap.not_found,
+      },
+      { key: "error", label: "Erro", items: errors, color: STATUS_COLORS.error, side: "right", refs: refsMap.error },
+    ],
+    [found, inconclusive, notFound, errors]
+  );
+
+  React.useEffect(() => {
+    // keep refs arrays sized to items count to avoid stale entries
+    for (const g of groups) {
+      g.refs.current.length = g.items.length;
+    }
+  }, [groups]);
   const [dims, setDims] = React.useState<{ w: number; h: number }>({ w: 0, h: 0 });
   const [conns, setConns] = React.useState<Conn[]>([]);
 
@@ -122,24 +168,20 @@ export function SideMindmap({ username, items, className, events, exportData = t
     const y1 = centerRect.top - rootRect.top + centerRect.height / 2;
 
     const acc: Conn[] = [];
-    const addRefs = (refArr: (HTMLDivElement | null)[], color: string, side: "left" | "right", dashed?: boolean) => {
-      const len = refArr.length;
-      for (let i = 0; i < len; i++) {
-        const node = refArr[i];
+    for (const g of groups) {
+      const arr = g.refs.current;
+      for (let i = 0; i < arr.length; i++) {
+        const node = arr[i];
         if (!node) continue;
         const nr = node.getBoundingClientRect();
         const midY = nr.top - rootRect.top + nr.height / 2;
-        const x2 = side === "left" ? nr.right - rootRect.left : nr.left - rootRect.left;
+        const x2 = g.side === "left" ? nr.right - rootRect.left : nr.left - rootRect.left;
         const y2 = midY;
-        acc.push({ x1, y1, x2, y2, color, dashed });
+        acc.push({ x1, y1, x2, y2, color: g.color, dashed: g.dashed });
       }
-    };
-    addRefs(foundRefs.current, STATUS_COLORS.found, "left", false);
-    addRefs(inconclusiveRefs.current, STATUS_COLORS.inconclusive, "right", true);
-    addRefs(notFoundRefs.current, STATUS_COLORS.not_found, "right", false);
-    addRefs(errorRefs.current, STATUS_COLORS.error, "right", false);
+    }
     setConns(acc);
-  }, [dims, found.length, inconclusive.length, notFound.length, errors.length]);
+  }, [dims, groups]);
 
   return (
     <Card className={className} sx={{ border: "none", backgroundColor: "transparent" }}>
@@ -171,10 +213,9 @@ export function SideMindmap({ username, items, className, events, exportData = t
       <Divider />
       <CardContent sx={{ pt: 2 }}>
         <Stack direction="row" spacing={1} flexWrap="wrap" mb={2}>
-          {found.length > 0 && <Legend label="Encontrado" color={STATUS_COLORS.found} />}
-          {inconclusive.length > 0 && <Legend label="Inconclusivo" color={STATUS_COLORS.inconclusive} />}
-          {notFound.length > 0 && <Legend label="Não encontrado" color={STATUS_COLORS.not_found} />}
-          {errors.length > 0 && <Legend label="Erro" color={STATUS_COLORS.error} />}
+          {groups.filter((g) => g.items.length > 0).map((g) => (
+            <Legend key={g.key} label={g.label} color={g.color} />
+          ))}
         </Stack>
 
         <Box ref={containerRef} sx={{ position: "relative" }}>
@@ -194,18 +235,22 @@ export function SideMindmap({ username, items, className, events, exportData = t
 
           {/* Content grid over the overlay */}
           <Box sx={{ position: "relative", zIndex: 1, display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr auto 1fr" }, gap: 2, alignItems: "start" }}>
-          {/* Coluna esquerda: Encontrado */}
+          {/* Coluna esquerda: grupos à esquerda */}
           <Stack spacing={1.25} sx={{ order: { xs: 2, md: 1 } }}>
-            {found.length > 0 && (
-              <Typography variant="subtitle2" color="success.main" sx={{ mb: 0.5 }}>
-                Encontrado
-              </Typography>
-            )}
-            {found.map((i, idx) => (
-              <div key={i.platform} ref={(el) => (foundRefs.current[idx] = el)}>
-                <Item item={i} color={STATUS_COLORS.found} />
-              </div>
-            ))}
+            {groups
+              .filter((g) => g.side === "left" && g.items.length > 0)
+              .map((g) => (
+                <React.Fragment key={`left-${g.key}`}>
+                  <Typography variant="subtitle2" sx={{ mb: 0.5, color: g.color }}>
+                    {g.label}
+                  </Typography>
+                  {g.items.map((i, idx) => (
+                    <div key={`${g.key}-${i.platform}`} ref={(el) => (g.refs.current[idx] = el)}>
+                      <Item item={i} color={g.color} dashed={g.dashed} muted={g.muted} />
+                    </div>
+                  ))}
+                </React.Fragment>
+              ))}
           </Stack>
 
           {/* Coluna central: núcleo (username) */}
@@ -225,40 +270,22 @@ export function SideMindmap({ username, items, className, events, exportData = t
             </Box>
           </Box>
 
-          {/* Coluna direita: Inconclusivo / Não encontrado / Erro */}
+          {/* Coluna direita: grupos à direita */}
           <Stack spacing={1.25} sx={{ order: { xs: 3, md: 3 } }}>
-            {inconclusive.length > 0 && (
-              <Typography variant="subtitle2" color="warning.main" sx={{ mb: 0.5 }}>
-                Inconclusivo
-              </Typography>
-            )}
-            {inconclusive.map((i, idx) => (
-              <div key={i.platform} ref={(el) => (inconclusiveRefs.current[idx] = el)}>
-                <Item item={i} color={STATUS_COLORS.inconclusive} dashed />
-              </div>
-            ))}
-
-            {notFound.length > 0 && (
-              <Typography variant="subtitle2" sx={{ mt: 1, mb: 0.5, color: STATUS_COLORS.not_found }}>
-                Não encontrado
-              </Typography>
-            )}
-            {notFound.map((i, idx) => (
-              <div key={i.platform} ref={(el) => (notFoundRefs.current[idx] = el)}>
-                <Item item={i} color={STATUS_COLORS.not_found} muted />
-              </div>
-            ))}
-
-            {errors.length > 0 && (
-              <Typography variant="subtitle2" sx={{ mt: 1, mb: 0.5, color: STATUS_COLORS.error }}>
-                Erro
-              </Typography>
-            )}
-            {errors.map((i, idx) => (
-              <div key={i.platform} ref={(el) => (errorRefs.current[idx] = el)}>
-                <Item item={i} color={STATUS_COLORS.error} />
-              </div>
-            ))}
+            {groups
+              .filter((g) => g.side === "right" && g.items.length > 0)
+              .map((g) => (
+                <React.Fragment key={`right-${g.key}`}>
+                  <Typography variant="subtitle2" sx={{ mb: 0.5, color: g.color }}>
+                    {g.label}
+                  </Typography>
+                  {g.items.map((i, idx) => (
+                    <div key={`${g.key}-${i.platform}`} ref={(el) => (g.refs.current[idx] = el)}>
+                      <Item item={i} color={g.color} dashed={g.dashed} muted={g.muted} />
+                    </div>
+                  ))}
+                </React.Fragment>
+              ))}
           </Stack>
           </Box>
         </Box>
