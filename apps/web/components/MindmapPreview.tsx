@@ -1,25 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { ExternalLink, Info, Dot, ShieldCheck } from "lucide-react";
-import {
-  Card,
-  CardHeader,
-  CardContent,
-  Divider,
-  Box,
-  Stack,
-  Typography,
-  Chip,
-  Tooltip,
-  useTheme,
-  Button,
-} from "@mui/material";
-import DownloadIcon from "@mui/icons-material/Download";
+import { ExternalLink, Dot, ShieldCheck } from "lucide-react";
+import { Card, CardHeader, CardContent, Divider, Box, Stack, Typography, Chip, useTheme } from "@mui/material";
 import type { MindmapPreviewProps, EdgeProps, SiteEvent } from "../types";
 import LegendChip from "@/components/LegendChip";
 import { STATUS_COLORS, colorFor, isSafeHttpUrl } from "@/lib/ui";
-import { exportCsv, exportJson } from "@/lib/export";
+import ExportButtons from "@/components/ExportButtons";
+import HelpHint from "@/components/HelpHint";
 
 const NODE_R = 20;
 const CORE_R = 34;
@@ -143,20 +131,10 @@ export function MindmapPreview({
           </Stack>
         }
         action={
-          <Tooltip
-            arrow
-            title={
-              <Box sx={{ fontSize: 12, maxWidth: 300 }}>
-                Cada nó representa uma plataforma. Cores indicam o status. Tracejado = heurístico. Clique/Enter abre a
-                URL quando disponível.
-              </Box>
-            }
-          >
-            <Stack direction="row" spacing={0.5} alignItems="center" sx={{ color: "text.secondary", cursor: "help" }}>
-              <Info size={18} />
-              <Typography variant="caption">Ajuda</Typography>
-            </Stack>
-          </Tooltip>
+          <HelpHint>
+            Cada nó representa uma plataforma. Cores indicam o status. Tracejado = heurístico. Clique/Enter abre a URL
+            quando disponível.
+          </HelpHint>
         }
         sx={{ pb: 1.5 }}
       />
@@ -328,26 +306,7 @@ export function MindmapPreview({
             })}
           </svg>
         </Box>
-        {exportData && (
-          <Stack direction="row" spacing={1} justifyContent="flex-end">
-            <Button
-              variant="contained"
-              startIcon={<DownloadIcon />}
-              disabled={!events.length}
-              onClick={() => exportCsv(username, events)}
-            >
-              CSV
-            </Button>
-            <Button
-              variant="contained"
-              startIcon={<DownloadIcon />}
-              disabled={!events.length}
-              onClick={() => exportJson(username, events)}
-            >
-              JSON
-            </Button>
-          </Stack>
-        )}
+        {exportData && <ExportButtons username={username} events={events} />}
       </CardContent>
     </Card>
   );
@@ -369,4 +328,3 @@ function Edge({ idx, x1, y1, x2, y2, animate, prefix }: EdgeProps) {
     </g>
   );
 }
-

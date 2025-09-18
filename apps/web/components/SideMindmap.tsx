@@ -1,11 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { Box, Card, CardContent, CardHeader, Chip, Divider, Stack, Tooltip, Typography, Button, useTheme } from "@mui/material";
-import { Info, ExternalLink } from "lucide-react";
-import DownloadIcon from "@mui/icons-material/Download";
+import { Box, Card, CardContent, CardHeader, Chip, Divider, Stack, Typography, useTheme } from "@mui/material";
+import { ExternalLink } from "lucide-react";
 import type { MindmapPreviewProps, MindmapItem, Status } from "../types";
 import LegendChip from "@/components/LegendChip";
+import HelpHint from "@/components/HelpHint";
+import ExportButtons from "@/components/ExportButtons";
 import { STATUS_COLORS, isSafeHttpUrl } from "@/lib/ui";
 import { exportCsv, exportJson } from "@/lib/export";
 
@@ -133,21 +134,7 @@ export function SideMindmap({ username, items, className, events, exportData = t
             </Typography>
           </Stack>
         }
-        action={
-          <Tooltip
-            arrow
-            title={
-              <Box sx={{ fontSize: 12, maxWidth: 320 }}>
-                Agrupado por status. Clique para abrir as URLs quando disponível. Heurísticos são marcados.
-              </Box>
-            }
-          >
-            <Stack direction="row" spacing={0.5} alignItems="center" sx={{ color: "text.secondary", cursor: "help" }}>
-              <Info size={18} />
-              <Typography variant="caption">Ajuda</Typography>
-            </Stack>
-          </Tooltip>
-        }
+        action={<HelpHint>Agrupado por status. Clique para abrir as URLs quando disponível. Heurísticos são marcados.</HelpHint>}
         sx={{ pb: 1.5 }}
       />
       <Divider />
@@ -230,16 +217,7 @@ export function SideMindmap({ username, items, className, events, exportData = t
           </Box>
         </Box>
 
-        {exportData && (
-          <Stack direction="row" spacing={1} justifyContent="flex-end" sx={{ mt: 2 }}>
-            <Button variant="contained" startIcon={<DownloadIcon />} disabled={!events.length} onClick={() => exportCsv(username, events)}>
-              CSV
-            </Button>
-            <Button variant="contained" startIcon={<DownloadIcon />} disabled={!events.length} onClick={() => exportJson(username, events)}>
-              JSON
-            </Button>
-          </Stack>
-        )}
+        {exportData && <ExportButtons username={username} events={events} sx={{ mt: 2 }} />}
       </CardContent>
     </Card>
   );
