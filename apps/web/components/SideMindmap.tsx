@@ -58,7 +58,18 @@ function exportCsv(username: string, events: SiteEvent[]) {
       rows.push([e.id, e.status, e.url ?? ""]);
     }
   }
-  const csv = header + rows.map((r) => r.map((c) => `"${String(c).replaceAll('"', '""')}"`).join(",")).join("\n");
+  const csv =
+    header +
+    rows
+      .map((r) =>
+        r
+          .map((c) => {
+            const esc = String(c).replace(/"/g, '""');
+            return `"${esc}"`;
+          })
+          .join(",")
+      )
+      .join("\n");
   const blob = new Blob([csv], { type: "text/csv" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -244,4 +255,3 @@ function Item({ item, color, dashed, muted }: { item: MindmapItem; color: string
     </a>
   );
 }
-
