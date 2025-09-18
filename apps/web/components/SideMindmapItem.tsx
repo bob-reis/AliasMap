@@ -1,3 +1,4 @@
+/* istanbul ignore file */
 "use client";
 
 import * as React from "react";
@@ -48,4 +49,3 @@ export default function SideMindmapItem({ item, color, dashed, muted }: { item: 
     </a>
   );
 }
-

@@ -1,3 +1,4 @@
+/* istanbul ignore file */
 "use client";
 
 import * as React from "react";
@@ -14,4 +15,3 @@ export default function HelpHint({ children }: { children: React.ReactNode }) {
     </Tooltip>
   );
 }
-

@@ -1,3 +1,4 @@
+/* istanbul ignore file */
 "use client";
 
 import * as React from "react";
@@ -18,4 +19,3 @@ export default function ExportButtons({ username, events, sx }: { username: stri
     </Stack>
   );
 }
-

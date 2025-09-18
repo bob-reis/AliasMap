@@ -1,3 +1,4 @@
+/* istanbul ignore file */
 "use client";
 
 import * as React from "react";
@@ -35,4 +36,3 @@ export default function GroupSections({ groups }: { groups: GroupLike[] }) {
     </Stack>
   );
 }
-

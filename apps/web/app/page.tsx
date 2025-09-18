@@ -11,15 +11,7 @@ import Loading from "@/components/LoadingScreen";
 import ResultsScreen from "@/components/ResultsScreen";
 import EthicsPage from "@/components/EthicsPage";
 import type { SiteEvent, Status, MindmapItem } from "../types";
-
-const normalizeStatus = (s: string): Status => {
-  const v = String(s).toLowerCase();
-  if (v.includes("found") || v === "200") return "found";
-  if (v.includes("not") || v === "404") return "not_found";
-  if (v.includes("timeout") || v.includes("error")) return "error";
-  if (v === "403" || v.includes("block")) return "inconclusive";
-  return "inconclusive";
-};
+import { normalizeStatus } from "@/lib/status";
 
 export default function HomeStepsSimple() {
   const [step, setStep] = React.useState<0 | 1 | 2 | 3>(0);
