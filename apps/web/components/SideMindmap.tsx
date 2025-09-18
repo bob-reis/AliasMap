@@ -79,12 +79,67 @@ function exportCsv(username: string, events: SiteEvent[]) {
   URL.revokeObjectURL(url);
 }
 
+type Conn = { x1: number; y1: number; x2: number; y2: number; color: string; dashed?: boolean };
+
 export function SideMindmap({ username, items, className, events, exportData = true }: MindmapPreviewProps) {
   const theme = useTheme();
   const found = items.filter((i) => i.status === "found");
   const inconclusive = items.filter((i) => i.status === "inconclusive");
   const notFound = items.filter((i) => i.status === "not_found");
   const errors = items.filter((i) => i.status === "error");
+
+  const containerRef = React.useRef<HTMLDivElement | null>(null);
+  const centerRef = React.useRef<HTMLDivElement | null>(null);
+  const foundRefs = React.useRef<(HTMLDivElement | null)[]>([]);
+  const inconclusiveRefs = React.useRef<(HTMLDivElement | null)[]>([]);
+  const notFoundRefs = React.useRef<(HTMLDivElement | null)[]>([]);
+  const errorRefs = React.useRef<(HTMLDivElement | null)[]>([]);
+  const [dims, setDims] = React.useState<{ w: number; h: number }>({ w: 0, h: 0 });
+  const [conns, setConns] = React.useState<Conn[]>([]);
+
+  React.useLayoutEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      for (const e of entries) {
+        const cr = e.contentRect;
+        setDims({ w: Math.max(320, cr.width), h: Math.max(160, cr.height) });
+      }
+    });
+    ro.observe(el);
+    const r = el.getBoundingClientRect();
+    setDims({ w: Math.max(320, r.width), h: Math.max(160, r.height) });
+    return () => ro.disconnect();
+  }, []);
+
+  React.useLayoutEffect(() => {
+    const root = containerRef.current;
+    const center = centerRef.current;
+    if (!root || !center) return;
+    const rootRect = root.getBoundingClientRect();
+    const centerRect = center.getBoundingClientRect();
+    const x1 = centerRect.left - rootRect.left + centerRect.width / 2;
+    const y1 = centerRect.top - rootRect.top + centerRect.height / 2;
+
+    const acc: Conn[] = [];
+    const addRefs = (refArr: (HTMLDivElement | null)[], color: string, side: "left" | "right", dashed?: boolean) => {
+      const len = refArr.length;
+      for (let i = 0; i < len; i++) {
+        const node = refArr[i];
+        if (!node) continue;
+        const nr = node.getBoundingClientRect();
+        const midY = nr.top - rootRect.top + nr.height / 2;
+        const x2 = side === "left" ? nr.right - rootRect.left : nr.left - rootRect.left;
+        const y2 = midY;
+        acc.push({ x1, y1, x2, y2, color, dashed });
+      }
+    };
+    addRefs(foundRefs.current, STATUS_COLORS.found, "left", false);
+    addRefs(inconclusiveRefs.current, STATUS_COLORS.inconclusive, "right", true);
+    addRefs(notFoundRefs.current, STATUS_COLORS.not_found, "right", false);
+    addRefs(errorRefs.current, STATUS_COLORS.error, "right", false);
+    setConns(acc);
+  }, [dims, found.length, inconclusive.length, notFound.length, errors.length]);
 
   return (
     <Card className={className} sx={{ border: "none", backgroundColor: "transparent" }}>
@@ -122,7 +177,23 @@ export function SideMindmap({ username, items, className, events, exportData = t
           {errors.length > 0 && <Legend label="Erro" color={STATUS_COLORS.error} />}
         </Stack>
 
-        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr auto 1fr" }, gap: 2, alignItems: "start" }}>
+        <Box ref={containerRef} sx={{ position: "relative" }}>
+          {/* Overlay with connections */}
+          <Box sx={{ position: "absolute", inset: 0, zIndex: 0, pointerEvents: "none" }}>
+            <svg width={dims.w} height={dims.h} viewBox={`0 0 ${dims.w} ${dims.h}`}
+              style={{ display: "block", width: "100%", height: "100%" }}>
+              {conns.map((c, i) => {
+                const ctrlX = (c.x1 + c.x2) / 2; // gentle curve
+                const d = `M ${c.x1} ${c.y1} Q ${ctrlX} ${c.y1} ${c.x2} ${c.y2}`;
+                return (
+                  <path key={i} d={d} stroke={c.color} strokeWidth={1.25} fill="none" strokeDasharray={c.dashed ? "4 3" : undefined} strokeOpacity={0.5} />
+                );
+              })}
+            </svg>
+          </Box>
+
+          {/* Content grid over the overlay */}
+          <Box sx={{ position: "relative", zIndex: 1, display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr auto 1fr" }, gap: 2, alignItems: "start" }}>
           {/* Coluna esquerda: Encontrado */}
           <Stack spacing={1.25} sx={{ order: { xs: 2, md: 1 } }}>
             {found.length > 0 && (
@@ -130,13 +201,15 @@ export function SideMindmap({ username, items, className, events, exportData = t
                 Encontrado
               </Typography>
             )}
-            {found.map((i) => (
-              <Item key={i.platform} item={i} color={STATUS_COLORS.found} />
+            {found.map((i, idx) => (
+              <div key={i.platform} ref={(el) => (foundRefs.current[idx] = el)}>
+                <Item item={i} color={STATUS_COLORS.found} />
+              </div>
             ))}
           </Stack>
 
           {/* Coluna central: núcleo (username) */}
-          <Box sx={{ order: { xs: 1, md: 2 }, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 120 }}>
+          <Box ref={centerRef} sx={{ order: { xs: 1, md: 2 }, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 120 }}>
             <Box
               sx={{
                 borderRadius: 2,
@@ -159,8 +232,10 @@ export function SideMindmap({ username, items, className, events, exportData = t
                 Inconclusivo
               </Typography>
             )}
-            {inconclusive.map((i) => (
-              <Item key={i.platform} item={i} color={STATUS_COLORS.inconclusive} dashed />
+            {inconclusive.map((i, idx) => (
+              <div key={i.platform} ref={(el) => (inconclusiveRefs.current[idx] = el)}>
+                <Item item={i} color={STATUS_COLORS.inconclusive} dashed />
+              </div>
             ))}
 
             {notFound.length > 0 && (
@@ -168,8 +243,10 @@ export function SideMindmap({ username, items, className, events, exportData = t
                 Não encontrado
               </Typography>
             )}
-            {notFound.map((i) => (
-              <Item key={i.platform} item={i} color={STATUS_COLORS.not_found} muted />
+            {notFound.map((i, idx) => (
+              <div key={i.platform} ref={(el) => (notFoundRefs.current[idx] = el)}>
+                <Item item={i} color={STATUS_COLORS.not_found} muted />
+              </div>
             ))}
 
             {errors.length > 0 && (
@@ -177,10 +254,13 @@ export function SideMindmap({ username, items, className, events, exportData = t
                 Erro
               </Typography>
             )}
-            {errors.map((i) => (
-              <Item key={i.platform} item={i} color={STATUS_COLORS.error} />
+            {errors.map((i, idx) => (
+              <div key={i.platform} ref={(el) => (errorRefs.current[idx] = el)}>
+                <Item item={i} color={STATUS_COLORS.error} />
+              </div>
             ))}
           </Stack>
+          </Box>
         </Box>
 
         {exportData && (
