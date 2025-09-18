@@ -1,50 +1,16 @@
 "use client";
 
 import * as React from "react";
-import { ExternalLink, Info, Dot, ShieldCheck } from "lucide-react";
-import {
-  Card,
-  CardHeader,
-  CardContent,
-  Divider,
-  Box,
-  Stack,
-  Typography,
-  Chip,
-  Tooltip,
-  useTheme,
-  Button,
-} from "@mui/material";
-import DownloadIcon from "@mui/icons-material/Download";
-import type { MindmapPreviewProps, EdgeProps, LegendProps, SiteEvent } from "../types";
-
-/* ===== Constantes/Utils ===== */
-const STATUS_COLORS = {
-  found: "#10B981",
-  inconclusive: "#F59E0B",
-  not_found: "#9CA3AF",
-  unknown: "#EF4444",
-} as const;
+import { ExternalLink, Dot, ShieldCheck } from "lucide-react";
+import { Card, CardHeader, CardContent, Divider, Box, Stack, Typography, Chip, useTheme, Tooltip } from "@mui/material";
+import type { MindmapPreviewProps, EdgeProps, SiteEvent } from "../types";
+import LegendChip from "@/components/LegendChip";
+import { STATUS_COLORS, colorFor, isSafeHttpUrl } from "@/lib/ui";
+import ExportButtons from "@/components/ExportButtons";
+import HelpHint from "@/components/HelpHint";
 
 const NODE_R = 20;
 const CORE_R = 34;
-
-function colorFor(status: string): string {
-  if (status === "found") return STATUS_COLORS.found;
-  if (status === "inconclusive") return STATUS_COLORS.inconclusive;
-  if (status === "not_found") return STATUS_COLORS.not_found;
-  return STATUS_COLORS.unknown;
-}
-
-function isSafeHttpUrl(u?: string): u is string {
-  if (!u) return false;
-  try {
-    const url = new URL(u);
-    return url.protocol === "http:" || url.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
 
 function truncate(s: string, max = 12) {
   return s.length > max ? s.slice(0, max - 1) + "…" : s;
@@ -108,36 +74,6 @@ export function MindmapPreview({
   const shadowId = `${idPrefix}-mm-shadow`;
   const ariaLabel = `Mapa de evidências para ${username || "alvo"} com ${items.length} plataformas`;
 
-  function exportJson(username: string, events: SiteEvent[]) {
-    const payload = { username, events };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], {
-      type: "application/json",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `aliasmap-${username || "resultado"}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  function exportCsv(username: string, events: SiteEvent[]) {
-    const header = `user=${username}\n`;
-    const rows = [["platform", "status", "url"]];
-    for (const e of events) {
-      if (e.type === "site_result") {
-        rows.push([e.id, e.status, e.url ?? ""]);
-      }
-    }
-    const csv = header + rows.map((r) => r.map((v) => `"${v}"`).join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `aliasmap-${username || "resultado"}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
 
   if (!items || items.length === 0) {
     return (
@@ -195,20 +131,10 @@ export function MindmapPreview({
           </Stack>
         }
         action={
-          <Tooltip
-            arrow
-            title={
-              <Box sx={{ fontSize: 12, maxWidth: 300 }}>
-                Cada nó representa uma plataforma. Cores indicam o status. Tracejado = heurístico. Clique/Enter abre a
-                URL quando disponível.
-              </Box>
-            }
-          >
-            <Stack direction="row" spacing={0.5} alignItems="center" sx={{ color: "text.secondary", cursor: "help" }}>
-              <Info size={18} />
-              <Typography variant="caption">Ajuda</Typography>
-            </Stack>
-          </Tooltip>
+          <HelpHint>
+            Cada nó representa uma plataforma. Cores indicam o status. Tracejado = heurístico. Clique/Enter abre a URL
+            quando disponível.
+          </HelpHint>
         }
         sx={{ pb: 1.5 }}
       />
@@ -217,10 +143,13 @@ export function MindmapPreview({
 
       <CardContent sx={{ pt: 2 }}>
         <Stack direction="row" spacing={1} flexWrap="wrap" mb={2}>
-          <Legend label="Encontrado" color={STATUS_COLORS.found} />
-          <Legend label="Inconclusivo" color={STATUS_COLORS.inconclusive} />
-          <Legend label="Não encontrado" color={STATUS_COLORS.not_found} />
-          <Legend label="Erro/Desconhecido" color={STATUS_COLORS.unknown} />
+          {Array.from(new Set(items.map((i) => i.status))).map((s) => {
+            if (s === "found") return <LegendChip key={s} label="Encontrado" color={STATUS_COLORS.found} />;
+            if (s === "inconclusive") return <LegendChip key={s} label="Inconclusivo" color={STATUS_COLORS.inconclusive} />;
+            if (s === "not_found") return <LegendChip key={s} label="Não encontrado" color={STATUS_COLORS.not_found} />;
+            if (s === "error") return <LegendChip key={s} label="Erro" color={STATUS_COLORS.error} />;
+            return null;
+          })}
         </Stack>
         <Box ref={ref} sx={{ width: "100%", height: { xs: 320, sm: 380, md: 420 }, position: "relative" }}>
           <svg
@@ -277,7 +206,7 @@ export function MindmapPreview({
 
             {/* nós */}
             {nodes.map((n, idx) => {
-              const stroke = colorFor(n.rawStatus ?? n.status);
+              const stroke = colorFor(n.status);
               const isHeuristic = Boolean(n.heuristic);
               const label = truncate(n.platform, maxLabel);
 
@@ -377,26 +306,7 @@ export function MindmapPreview({
             })}
           </svg>
         </Box>
-        {exportData && (
-          <Stack direction="row" spacing={1} justifyContent="flex-end">
-            <Button
-              variant="contained"
-              startIcon={<DownloadIcon />}
-              disabled={!events.length}
-              onClick={() => exportCsv(username, events)}
-            >
-              CSV
-            </Button>
-            <Button
-              variant="contained"
-              startIcon={<DownloadIcon />}
-              disabled={!events.length}
-              onClick={() => exportJson(username, events)}
-            >
-              JSON
-            </Button>
-          </Stack>
-        )}
+        {exportData && <ExportButtons username={username} events={events} />}
       </CardContent>
     </Card>
   );
@@ -416,20 +326,5 @@ function Edge({ idx, x1, y1, x2, y2, animate, prefix }: EdgeProps) {
         ) : null}
       </line>
     </g>
-  );
-}
-
-function Legend({ label, color }: LegendProps) {
-  return (
-    <Chip
-      variant="outlined"
-      label={
-        <Stack direction="row" spacing={1} alignItems="center">
-          <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: color }} />
-          <span>{label}</span>
-        </Stack>
-      }
-      sx={{ "& .MuiChip-label": { display: "flex", alignItems: "center", py: 0.5, px: 1 } }}
-    />
   );
 }
