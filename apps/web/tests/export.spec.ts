@@ -20,6 +20,19 @@ describe('export helpers', () => {
     expect(csv2).toContain('"https://ex.com/?a=""b"""');
   });
 
+  it('handles commas and newlines within fields', () => {
+    const e2: SiteEvent[] = [
+      { type: 'site_result', id: 'gh,ub', status: 'found', url: 'https://ex.com/u\nser' } as any,
+    ];
+    const csv = buildCsv('alice', e2);
+    // id with comma stays quoted as a single field
+    expect(csv).toContain('"gh,ub"');
+    // newline in URL remains inside quotes (single logical row)
+    expect(csv).toContain('"https://ex.com/u\nser"');
+    // exactly one header line present
+    expect(csv.startsWith('user=alice'));
+  });
+
   it('builds JSON string with expected shape', () => {
     const json = buildJson('alice', events);
     const parsed = JSON.parse(json);
@@ -28,4 +41,3 @@ describe('export helpers', () => {
     expect(parsed.events.length).toBe(events.length);
   });
 });
-

@@ -18,4 +18,17 @@ describe('ui helpers', () => {
     expect(isSafeHttpUrl(`${scheme}alert(1)`)).toBe(false);
     expect(isSafeHttpUrl(undefined)).toBe(false);
   });
+
+  it('rejects relative and scheme-less urls', () => {
+    expect(isSafeHttpUrl('example.com')).toBe(false);
+    expect(isSafeHttpUrl('//example.com')).toBe(false);
+    expect(isSafeHttpUrl('/path')).toBe(false);
+    expect(isSafeHttpUrl('')).toBe(false);
+  });
+
+  it('rejects non-http(s) schemes', () => {
+    expect(isSafeHttpUrl('mailto:test@example.com')).toBe(false);
+    expect(isSafeHttpUrl('data:text/plain;base64,AAAA')).toBe(false);
+    expect(isSafeHttpUrl('wss://example.com/socket')).toBe(false);
+  });
 });
