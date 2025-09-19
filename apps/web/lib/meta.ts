@@ -15,6 +15,14 @@ export function extractMeta(html: string, baseUrl: string): ExtractedMeta {
     const match = html.match(re);
     return match?.[1];
   };
+  const decodeJsonUrl = (s?: string) =>
+    s
+      ? s
+          .replace(/\\\//g, "/")
+          .replace(/\\u0026/gi, "&")
+          .replace(/\\u003c/gi, "<")
+          .replace(/\\u003e/gi, ">")
+      : s;
 
   // Image candidates: og:image:secure_url, og:image, twitter:image, JSON-LD image
   const ogImageSecure = get(/<meta[^>]+property=["']og:image:secure_url["'][^>]+content=["']([^"']+)/i);
@@ -44,6 +52,21 @@ export function extractMeta(html: string, baseUrl: string): ExtractedMeta {
   }
 
   // Instagram-specific fallback: scan <img> tags with alt indicating profile picture (localized variants)
+  if (!m.image) {
+    try {
+      const host = new URL(baseUrl).host.toLowerCase();
+      if (host.includes('instagram.com')) {
+        // Try embedded script JSON first (profile_pic_url_hd or profile_pic_url)
+        const picHd = html.match(/"profile_pic_url_hd"\s*:\s*"([^"]+)"/i)?.[1];
+        const pic = html.match(/"profile_pic_url"\s*:\s*"([^"]+)"/i)?.[1];
+        const decoded = decodeJsonUrl(picHd || pic);
+        if (decoded) {
+          m.image = resolveUrlMaybe(decoded, baseUrl);
+        }
+      }
+    } catch {}
+  }
+
   if (!m.image) {
     try {
       const host = new URL(baseUrl).host.toLowerCase();

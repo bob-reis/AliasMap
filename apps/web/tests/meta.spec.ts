@@ -36,4 +36,14 @@ describe('meta extraction', () => {
     const m = extractMeta(igHtml, 'https://www.instagram.com/alice/');
     expect(m.image).toBe('https://www.instagram.com/avatar150.jpg');
   });
+
+  it('extracts instagram profile image from embedded JSON (profile_pic_url_hd)', () => {
+    const igHtml = `
+    <html><head><title>@alice • Instagram</title></head>
+    <body>
+      <script>window.__whatever__ = {"profile_pic_url_hd":"https:\/\/cdn.example.com\/avatar_hd.jpg?param=1\u0026n=2"}</script>
+    </body></html>`;
+    const m = extractMeta(igHtml, 'https://www.instagram.com/alice/');
+    expect(m.image).toBe('https://cdn.example.com/avatar_hd.jpg?param=1&n=2');
+  });
 });
