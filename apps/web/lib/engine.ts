@@ -155,7 +155,16 @@ async function checkSite(site: SiteSpec, username: string): Promise<SiteResult> 
           if (!evidence.length) evidence.push({ kind: 'username-text', value: (u ?? username) });
           return { id: site.id, status: 'found', url, latencyMs: Date.now() - start, evidence, metadata };
         }
-        if (metadata.image && (hasUserInTitle || igEarlyEvidence)) {
+        const imageHostOk = (() => {
+          try {
+            if (!metadata.image) return false;
+            const h = new URL(metadata.image).host.toLowerCase();
+            return h.includes('fbcdn.net') || h.includes('cdninstagram.com') || h.includes('instagram');
+          } catch {
+            return false;
+          }
+        })();
+        if (metadata.image && (hasUserInTitle || igEarlyEvidence || imageHostOk)) {
           const evidence: Evidence[] = [{ kind: 'pattern', value: 'og:image present' }];
           if (igEarlyEvidence) evidence.push(...igEarlyEvidence);
           return { id: site.id, status: 'found', url, latencyMs: Date.now() - start, evidence, metadata };
