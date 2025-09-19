@@ -43,6 +43,37 @@ export function extractMeta(html: string, baseUrl: string): ExtractedMeta {
     if (linkImage) m.image = resolveUrlMaybe(linkImage, baseUrl);
   }
 
+  // Instagram-specific fallback: scan <img> tags with alt indicating profile picture (localized variants)
+  if (!m.image) {
+    try {
+      const host = new URL(baseUrl).host.toLowerCase();
+      if (host.includes('instagram.com')) {
+        // Common localized keywords: profile, perfil, profil, foto del perfil, photo de profil
+        const imgRe = /<img[^>]+alt=["']([^"']+)["'][^>]*>/gi;
+        let match: RegExpExecArray | null;
+        while ((match = imgRe.exec(html))) {
+          const alt = match[1].toLowerCase();
+          if (/(profile|perfil|profil)/i.test(alt)) {
+            const tag = match[0];
+            const src = (tag.match(/\s src=["']([^"']+)["']/i)?.[1]) || undefined;
+            const srcset = (tag.match(/\s srcset=["']([^"']+)["']/i)?.[1]) || undefined;
+            let candidate = src;
+            if (!candidate && srcset) {
+              // take first URL from srcset
+              candidate = srcset.split(',')[0]?.trim().split(' ')[0];
+            }
+            if (candidate) {
+              m.image = resolveUrlMaybe(candidate, baseUrl);
+              break;
+            }
+          }
+        }
+      }
+    } catch {
+      // ignore URL parsing errors
+    }
+  }
+
   // Title candidates
   const ogTitle = get(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)/i);
   const titleTag = get(/<title[^>]*>([^<]+)<\/title>/i);

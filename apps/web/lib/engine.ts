@@ -160,6 +160,10 @@ async function checkSite(site: SiteSpec, username: string): Promise<SiteResult> 
           if (igEarlyEvidence) evidence.push(...igEarlyEvidence);
           return { id: site.id, status: 'found', url, latencyMs: Date.now() - start, evidence, metadata };
         }
+        if (igEarlyEvidence) {
+          // Fallback to early redirect signal as found to avoid regressions
+          return { id: site.id, status: 'found', url, latencyMs: Date.now() - start, evidence: igEarlyEvidence };
+        }
         // If we had early redirect evidence but could not extract an image, keep signal as inconclusive here.
       }
       if (matchedNotFound) {

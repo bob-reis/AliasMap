@@ -26,5 +26,14 @@ describe('meta extraction', () => {
     expect(resolveUrlMaybe(undefined as any, 'https://e.com')).toBeUndefined();
     expect(resolveUrlMaybe('///bad', 'https://e.com')).toBeDefined();
   });
-});
 
+  it('extracts instagram profile image from img alt fallback', () => {
+    const igHtml = `
+    <html><head><title>@alice • Instagram</title></head>
+    <body>
+      <img alt="Foto do perfil de alice" src="/avatar150.jpg" />
+    </body></html>`;
+    const m = extractMeta(igHtml, 'https://www.instagram.com/alice/');
+    expect(m.image).toBe('https://www.instagram.com/avatar150.jpg');
+  });
+});
