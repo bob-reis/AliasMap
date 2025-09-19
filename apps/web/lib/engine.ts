@@ -160,6 +160,21 @@ async function checkSite(site: SiteSpec, username: string): Promise<SiteResult> 
           if (igEarlyEvidence) evidence.push(...igEarlyEvidence);
           return { id: site.id, status: 'found', url, latencyMs: Date.now() - start, evidence, metadata };
         }
+        // Final fallback: public web_profile_info endpoint (no login). Best-effort only.
+        try {
+          const apiUrl = `https://www.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(uname)}`;
+          const apiRes = await fetchWithTimeout(apiUrl, Math.min(timeout, 2500));
+          if (apiRes.ok && apiRes.headers.get('content-type')?.includes('application/json')) {
+            const j: any = await apiRes.json();
+            const user = j?.data?.user;
+            const pic = user?.profile_pic_url_hd || user?.profile_pic_url;
+            if (pic) {
+              const evidence: Evidence[] = [{ kind: 'pattern', value: 'api: web_profile_info' }];
+              if (igEarlyEvidence) evidence.push(...igEarlyEvidence);
+              return { id: site.id, status: 'found', url, latencyMs: Date.now() - start, evidence, metadata: { ...(metadata || {}), image: pic } };
+            }
+          }
+        } catch { /* ignore */ }
         if (igEarlyEvidence) {
           // Fallback to early redirect signal as found to avoid regressions
           return { id: site.id, status: 'found', url, latencyMs: Date.now() - start, evidence: igEarlyEvidence };
