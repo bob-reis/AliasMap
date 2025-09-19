@@ -179,6 +179,10 @@ async function checkSite(site: SiteSpec, username: string): Promise<SiteResult> 
             }
           }
         } catch { /* ignore */ }
+        if (igEarlyEvidence) {
+          // Accept early redirect evidence as found when other signals are unavailable
+          return { id: site.id, status: 'found', url, latencyMs: Date.now() - start, evidence: igEarlyEvidence };
+        }
         // If we had early redirect evidence but could not extract an image, keep signal as inconclusive here.
       }
       if (matchedNotFound) {
