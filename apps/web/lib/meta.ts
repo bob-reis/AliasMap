@@ -51,6 +51,50 @@ export function extractMeta(html: string, baseUrl: string): ExtractedMeta {
     if (linkImage) m.image = resolveUrlMaybe(linkImage, baseUrl);
   }
 
+  // Instagram-specific: parse embedded script JSON (ProfilePage/graphql) to locate user + avatar
+  if (!m.image) {
+    try {
+      const host = new URL(baseUrl).host.toLowerCase();
+      if (host.includes('instagram.com')) {
+        const pathParts = new URL(baseUrl).pathname.split('/').filter(Boolean);
+        const uname = (pathParts[0] || '').toLowerCase();
+        const scriptRe = /<script[^>]*>([\s\S]*?)<\/script>/gi;
+        let sMatch: RegExpExecArray | null;
+        outer: while ((sMatch = scriptRe.exec(html))) {
+          const content = sMatch[1];
+          if (!/ProfilePage|graphql|profile_pic_url/i.test(content)) continue;
+          const start = content.indexOf('{');
+          const end = content.lastIndexOf('}');
+          if (start < 0 || end <= start) continue;
+          const blob = content.slice(start, end + 1);
+          try {
+            const data = JSON.parse(blob);
+            const queue: any[] = [data];
+            const seen = new Set<any>();
+            while (queue.length) {
+              const node = queue.shift();
+              if (!node || typeof node !== 'object' || seen.has(node)) continue;
+              seen.add(node);
+              const user = (node as any).user || (node as any).graphql?.user || (node as any).profile?.user;
+              if (user && typeof user === 'object') {
+                const u = String(user.username || '').toLowerCase();
+                const pic = user.profile_pic_url_hd || user.profile_pic_url;
+                if (u && u === uname && typeof pic === 'string') {
+                  m.image = resolveUrlMaybe(decodeJsonUrl(pic), baseUrl);
+                  break outer;
+                }
+              }
+              for (const k of Object.keys(node)) {
+                const v: any = (node as any)[k];
+                if (v && typeof v === 'object') queue.push(v);
+              }
+            }
+          } catch {}
+        }
+      }
+    } catch {}
+  }
+
   // Instagram-specific fallback: scan <img> tags with alt indicating profile picture (localized variants)
   if (!m.image) {
     try {
