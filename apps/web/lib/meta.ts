@@ -16,7 +16,8 @@ export function extractMeta(html: string, baseUrl: string): ExtractedMeta {
     return match?.[1];
   };
 
-  // Image candidates: og:image, twitter:image, JSON-LD image
+  // Image candidates: og:image:secure_url, og:image, twitter:image, JSON-LD image
+  const ogImageSecure = get(/<meta[^>]+property=["']og:image:secure_url["'][^>]+content=["']([^"']+)/i);
   const ogImage = get(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)/i);
   const twImage = get(/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)/i);
   const ldJsonMatch = html.match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i);
@@ -35,7 +36,12 @@ export function extractMeta(html: string, baseUrl: string): ExtractedMeta {
       // ignore JSON-LD parse errors
     }
   }
-  if (!m.image) m.image = resolveUrlMaybe(ogImage || twImage, baseUrl);
+  if (!m.image) m.image = resolveUrlMaybe(ogImageSecure || ogImage || twImage, baseUrl);
+  if (!m.image) {
+    // Fallback to link rel="image_src" (rare)
+    const linkImage = get(/<link[^>]+rel=["'][^"']*image_src[^"']*["'][^>]+href=["']([^"']+)/i);
+    if (linkImage) m.image = resolveUrlMaybe(linkImage, baseUrl);
+  }
 
   // Title candidates
   const ogTitle = get(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)/i);
@@ -49,4 +55,3 @@ export function extractMeta(html: string, baseUrl: string): ExtractedMeta {
 
   return m;
 }
-

@@ -55,6 +55,7 @@ async function checkSite(site: SiteSpec, username: string): Promise<SiteResult> 
     const timeout = site.profile.timeoutMs ?? 3500;
 
     // Instagram: detect login redirect preserving username in `next` as strong existence signal
+    let igEarlyEvidence: Evidence[] | undefined;
     if (site.id === 'instagram') {
       const ctrl0 = new AbortController();
       const id0 = setTimeout(() => ctrl0.abort(), timeout);
@@ -77,13 +78,8 @@ async function checkSite(site: SiteSpec, username: string): Promise<SiteResult> 
           const dec = decodeURIComponent(abs.toLowerCase());
           const uname = (u ?? username).toLowerCase();
           if (dec.includes('/accounts/login/') && dec.includes(`/${uname}/`)) {
-            return {
-              id: site.id,
-              status: 'found',
-              url,
-              latencyMs: Date.now() - start,
-              evidence: [{ kind: 'final_url', value: abs }]
-            };
+            igEarlyEvidence = [{ kind: 'final_url', value: abs }];
+            // do not return yet; proceed to fetch HTML to extract metadata for avatar/title
           }
         }
         // Fall through to content-based heuristics below
@@ -159,10 +155,12 @@ async function checkSite(site: SiteSpec, username: string): Promise<SiteResult> 
           if (!evidence.length) evidence.push({ kind: 'username-text', value: (u ?? username) });
           return { id: site.id, status: 'found', url, latencyMs: Date.now() - start, evidence, metadata };
         }
-        if (metadata.image && hasUserInTitle) {
-          const evidence: Evidence[] = [{ kind: 'pattern', value: 'og:image & title match username' }];
+        if (metadata.image && (hasUserInTitle || igEarlyEvidence)) {
+          const evidence: Evidence[] = [{ kind: 'pattern', value: 'og:image present' }];
+          if (igEarlyEvidence) evidence.push(...igEarlyEvidence);
           return { id: site.id, status: 'found', url, latencyMs: Date.now() - start, evidence, metadata };
         }
+        // If we had early redirect evidence but could not extract an image, keep signal as inconclusive here.
       }
       if (matchedNotFound) {
         return { id: site.id, status: 'not_found', url, latencyMs: Date.now() - start, evidence: [{ kind: 'pattern', value: matchedNotFound }] };
