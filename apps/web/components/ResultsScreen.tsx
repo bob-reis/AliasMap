@@ -19,10 +19,6 @@ export default function ResultsScreen({ trimmed, itemsFocus, itemsAll, events }:
         return itemsAll.filter((i) => i.status === "found");
       case "inconclusive":
         return itemsAll.filter((i) => i.status === "inconclusive");
-      case "not_found":
-        return itemsAll.filter((i) => i.status === "not_found");
-      case "error":
-        return itemsAll.filter((i) => i.status === "error");
       default:
         return itemsFocus;
     }
