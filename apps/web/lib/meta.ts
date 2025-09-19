@@ -56,11 +56,14 @@ export function extractMeta(html: string, baseUrl: string): ExtractedMeta {
     try {
       const host = new URL(baseUrl).host.toLowerCase();
       if (host.includes('instagram.com')) {
-        // Try embedded script JSON first (profile_pic_url_hd or profile_pic_url)
+        // Try embedded script JSON first with username confirmation
+        const pathParts = new URL(baseUrl).pathname.split('/').filter(Boolean);
+        const uname = (pathParts[0] || '').toLowerCase();
+        const jsonUser = html.match(/"username"\s*:\s*"([^"]+)"/i)?.[1]?.toLowerCase();
         const picHd = html.match(/"profile_pic_url_hd"\s*:\s*"([^"]+)"/i)?.[1];
         const pic = html.match(/"profile_pic_url"\s*:\s*"([^"]+)"/i)?.[1];
         const decoded = decodeJsonUrl(picHd || pic);
-        if (decoded) {
+        if (decoded && uname && jsonUser === uname) {
           m.image = resolveUrlMaybe(decoded, baseUrl);
         }
       }
@@ -71,12 +74,14 @@ export function extractMeta(html: string, baseUrl: string): ExtractedMeta {
     try {
       const host = new URL(baseUrl).host.toLowerCase();
       if (host.includes('instagram.com')) {
+        const pathParts = new URL(baseUrl).pathname.split('/').filter(Boolean);
+        const uname = (pathParts[0] || '').toLowerCase();
         // Common localized keywords: profile, perfil, profil, foto del perfil, photo de profil
         const imgRe = /<img[^>]+alt=["']([^"']+)["'][^>]*>/gi;
         let match: RegExpExecArray | null;
         while ((match = imgRe.exec(html))) {
           const alt = match[1].toLowerCase();
-          if (/(profile|perfil|profil)/i.test(alt)) {
+          if (/(profile|perfil|profil)/i.test(alt) && (!!uname && alt.includes(uname))) {
             const tag = match[0];
             const src = (tag.match(/\s src=["']([^"']+)["']/i)?.[1]) || undefined;
             const srcset = (tag.match(/\s srcset=["']([^"']+)["']/i)?.[1]) || undefined;
