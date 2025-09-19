@@ -34,7 +34,7 @@ type Group = {
   refs: React.MutableRefObject<(HTMLDivElement | null)[]>;
 };
 
-export function SideMindmap({ username, items, className, events, exportData = true }: MindmapPreviewProps) {
+export function SideMindmap({ username, items, className, events, exportData = true, showPreviews }: MindmapPreviewProps) {
   const theme = useTheme();
   const found = React.useMemo(() => items.filter((i) => i.status === "found"), [items]);
   const inconclusive = React.useMemo(() => items.filter((i) => i.status === "inconclusive"), [items]);
@@ -154,7 +154,7 @@ export function SideMindmap({ username, items, className, events, exportData = t
           <Box sx={{ position: "relative", zIndex: 1, display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr auto 1fr" }, gap: 2, alignItems: "start" }}>
           {/* Coluna esquerda: grupos à esquerda */}
           <Box sx={{ order: { xs: 2, md: 1 } }}>
-            <GroupSections groups={groups.filter((g) => g.side === "left")} />
+            <GroupSections groups={groups.filter((g) => g.side === "left")} showPreviews={showPreviews} />
           </Box>
 
           {/* Coluna central: núcleo (username) */}
@@ -176,7 +176,7 @@ export function SideMindmap({ username, items, className, events, exportData = t
 
           {/* Coluna direita: grupos à direita */}
           <Box sx={{ order: { xs: 3, md: 3 } }}>
-            <GroupSections groups={groups.filter((g) => g.side === "right")} />
+            <GroupSections groups={groups.filter((g) => g.side === "right")} showPreviews={showPreviews} />
           </Box>
           </Box>
         </Box>

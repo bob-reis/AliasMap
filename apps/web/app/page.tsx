@@ -40,6 +40,7 @@ export default function HomeStepsSimple() {
       rawStatus: e.status,
       heuristic: e.heuristic,
       url: e.url,
+      metadata: (e as any).metadata,
     }));
   }, [latestByPlatform]);
 

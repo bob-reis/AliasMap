@@ -10,7 +10,7 @@ export function middleware(req: NextRequest) {
   // If we want strict nonce-based CSP later, we can wire Next's nonce helpers.
   const csp = [
     "default-src 'self'",
-    "img-src 'self' data:",
+    "img-src 'self' https: data:",
     "style-src 'self' 'unsafe-inline'",
     "script-src 'self' 'unsafe-inline'",
     "connect-src 'self'",

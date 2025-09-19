@@ -39,4 +39,5 @@ export interface SiteResult {
   latencyMs: number;
   reason?: string;
   evidence?: Evidence[];
+  metadata?: { image?: string; title?: string; description?: string };
 }

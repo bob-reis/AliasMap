@@ -84,10 +84,17 @@ export const CORE_SITES: SiteSpec[] = [
     tier: 'fundamental',
     profile: {
       url: 'https://www.instagram.com/{username}/',
-      successPatterns: ['property="og:url"', 'instagram.com/{username}'],
+      successPatterns: [
+        // canonical or og:url that contains the username anywhere in the path
+        'rel=\"canonical\"[^>]+href=\"[^\"]*instagram\.com/[^\"]*{username}[^\"]*\"',
+        'property=\"og:url\"[^>]+content=\"[^\"]*instagram\.com/[^\"]*{username}[^\"]*\"'
+      ],
       notFoundPatterns: [
         "Sorry, this page isn't available.",
-        'Esta página não está disponível'
+        'Esta página não está disponível',
+        'O link em que você clicou pode não estar funcionando',
+        'a página pode ter sido removida',
+        'Voltar para o Instagram'
       ],
       timeoutMs: 3500
     },

@@ -16,7 +16,7 @@ type GroupLike = {
   refs: React.MutableRefObject<(HTMLDivElement | null)[]>;
 };
 
-export default function GroupSections({ groups }: { groups: GroupLike[] }) {
+export default function GroupSections({ groups, showPreviews }: { groups: GroupLike[]; showPreviews?: boolean }) {
   return (
     <Stack spacing={1.25}>
       {groups
@@ -28,7 +28,7 @@ export default function GroupSections({ groups }: { groups: GroupLike[] }) {
             </Typography>
             {g.items.map((i, idx) => (
               <div key={`${g.key}-${i.platform}`} ref={(el) => (g.refs.current[idx] = el)}>
-                <SideMindmapItem item={i} color={g.color} dashed={g.dashed} muted={g.muted} />
+                <SideMindmapItem item={i} color={g.color} dashed={g.dashed} muted={g.muted} showPreview={showPreviews} />
               </div>
             ))}
           </React.Fragment>

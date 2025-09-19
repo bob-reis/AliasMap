@@ -1,5 +1,6 @@
 import { CORE_SITES } from './sites.core';
 import type { SiteResult, SiteSpec, Evidence, Tier } from './types';
+import { extractMeta } from './meta';
 import { INFOOOZE_URLS } from './sites.infoooze';
 import { canonicalPlatformIdFromUrl } from './platforms';
 
@@ -53,7 +54,40 @@ async function checkSite(site: SiteSpec, username: string): Promise<SiteResult> 
   try {
     const timeout = site.profile.timeoutMs ?? 3500;
 
+    // Instagram: quick search API to confirm existence and get avatar/full name
+    if (site.id === 'instagram') {
+      try {
+        const uname = (u ?? username).toLowerCase();
+        const apiUrl = `https://www.instagram.com/web/search/topsearch/?query=${encodeURIComponent(uname)}`;
+        const apiRes = await fetchWithTimeout(apiUrl, Math.min(timeout, 2500));
+        if (apiRes.ok && apiRes.headers.get('content-type')?.includes('application/json')) {
+          const j: any = await apiRes.json();
+          const users: any[] = Array.isArray(j?.users) ? j.users : [];
+          const match = users.find((it: any) => it?.user?.username?.toLowerCase() === uname)?.user;
+          if (match) {
+            const evidence: Evidence[] = [{ kind: 'pattern', value: 'api: topsearch' }];
+            const image = match.profile_pic_url_hd || match.profile_pic_url;
+            const title = match.full_name || undefined;
+            return {
+              id: site.id,
+              status: 'found',
+              url,
+              latencyMs: Date.now() - start,
+              evidence,
+              metadata: { image, title }
+            };
+          }
+          if (users.length === 0) {
+            return { id: site.id, status: 'not_found', url, latencyMs: Date.now() - start };
+          }
+        }
+      } catch {
+        // ignore and continue
+      }
+    }
+
     // Instagram: detect login redirect preserving username in `next` as strong existence signal
+    let igEarlyEvidence: Evidence[] | undefined;
     if (site.id === 'instagram') {
       const ctrl0 = new AbortController();
       const id0 = setTimeout(() => ctrl0.abort(), timeout);
@@ -76,13 +110,8 @@ async function checkSite(site: SiteSpec, username: string): Promise<SiteResult> 
           const dec = decodeURIComponent(abs.toLowerCase());
           const uname = (u ?? username).toLowerCase();
           if (dec.includes('/accounts/login/') && dec.includes(`/${uname}/`)) {
-            return {
-              id: site.id,
-              status: 'found',
-              url,
-              latencyMs: Date.now() - start,
-              evidence: [{ kind: 'final_url', value: abs }]
-            };
+            igEarlyEvidence = [{ kind: 'final_url', value: abs }];
+            // do not return yet; proceed to fetch HTML to extract metadata for avatar/title
           }
         }
         // Fall through to content-based heuristics below
@@ -141,14 +170,66 @@ async function checkSite(site: SiteSpec, username: string): Promise<SiteResult> 
     const ogOk = matchesProfile(ogUrl ?? undefined);
     const finalUrlOk = matchesProfile(res.url);
 
-    // Site-specific tightening: Instagram requires canonical or og:url; URL path alone is not enough
+    // Site-specific tightening: Instagram profile pages often gate content.
+    // Strong signals:
+    // - canonical/og:url matches the expected profile URL, OR
+    // - og:image exists AND the title contains the @username (fallback)
     if (site.id === 'instagram') {
-      if (!matchedNotFound && usernameOk && (canonicalOk || ogOk)) {
-        const evidence: Evidence[] = [];
-        if (canonicalOk && canonical) evidence.push({ kind: 'canonical', value: canonical });
-        if (ogOk && ogUrl) evidence.push({ kind: 'og:url', value: ogUrl });
-        if (!evidence.length) evidence.push({ kind: 'username-text', value: (u ?? username) });
-        return { id: site.id, status: 'found', url, latencyMs: Date.now() - start, evidence };
+      if (!matchedNotFound) {
+        const metadata = extractMeta(body, expectedUrl);
+        const uname = (u ?? username).toLowerCase();
+        const titleLc = (metadata.title || '').toLowerCase();
+        const hasUserInTitle = titleLc.includes(`@${uname}`) || titleLc.includes(uname);
+        const jsonUser = body.match(/"username"\s*:\s*"([^"]+)"/i)?.[1]?.toLowerCase();
+        const userMatches = jsonUser === uname;
+        // 2-signal rule for Instagram
+        const signalCanonical = (canonicalOk || ogOk);
+        const signalUsername = usernameOk || hasUserInTitle;
+        const signalJsonUser = userMatches;
+        const imageHostOk = (() => {
+          try {
+            if (!metadata.image) return false;
+            const h = new URL(metadata.image).host.toLowerCase();
+            return h.includes('fbcdn.net') || h.includes('cdninstagram.com') || h.includes('instagram');
+          } catch {
+            return false;
+          }
+        })();
+        const signalImage = Boolean(metadata.image && imageHostOk);
+        const signalRedirect = Boolean(igEarlyEvidence && igEarlyEvidence.length);
+        const strongTwoSignal =
+          (signalCanonical && (signalUsername || signalJsonUser)) ||
+          (signalImage && (signalUsername || signalJsonUser));
+        const redirectTwoSignal = signalRedirect && (signalCanonical || signalJsonUser || signalImage);
+
+        if (strongTwoSignal || redirectTwoSignal) {
+          const evidence: Evidence[] = [];
+          if (canonicalOk && canonical) evidence.push({ kind: 'canonical', value: canonical });
+          if (ogOk && ogUrl) evidence.push({ kind: 'og:url', value: ogUrl });
+          if (signalUsername && !(canonicalOk || ogOk)) evidence.push({ kind: 'username-text', value: (u ?? username) });
+          if (signalImage) evidence.push({ kind: 'pattern', value: 'profile_image' });
+          if (signalRedirect && igEarlyEvidence) evidence.push(...igEarlyEvidence);
+          return { id: site.id, status: 'found', url, latencyMs: Date.now() - start, evidence, metadata };
+        }
+        // Final fallback: public web_profile_info endpoint (no login). Best-effort only.
+        try {
+          const apiUrl = `https://www.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(uname)}`;
+          const apiRes = await fetchWithTimeout(apiUrl, Math.min(timeout, 2500));
+          if (apiRes.ok && apiRes.headers.get('content-type')?.includes('application/json')) {
+            const j: any = await apiRes.json();
+            const user = j?.data?.user;
+            if (user && user.username?.toLowerCase() === uname) {
+              const pic = user.profile_pic_url_hd || user.profile_pic_url;
+              if (pic) {
+                const evidence: Evidence[] = [{ kind: 'pattern', value: 'api: web_profile_info' }];
+                return { id: site.id, status: 'found', url, latencyMs: Date.now() - start, evidence, metadata: { ...(metadata || {}), image: pic } };
+              }
+            } else if (j?.data && 'user' in j.data && j.data.user === null) {
+              return { id: site.id, status: 'not_found', url, latencyMs: Date.now() - start };
+            }
+          }
+        } catch { /* ignore */ }
+        // If we had early redirect evidence but could not extract an image, keep signal as inconclusive here.
       }
       if (matchedNotFound) {
         return { id: site.id, status: 'not_found', url, latencyMs: Date.now() - start, evidence: [{ kind: 'pattern', value: matchedNotFound }] };
@@ -165,7 +246,7 @@ async function checkSite(site: SiteSpec, username: string): Promise<SiteResult> 
           status: 'found',
           url,
           latencyMs: Date.now() - start,
-          evidence: [{ kind: 'pattern', value: matchedNotFound }]
+          evidence: [{ kind: 'pattern', value: matchedNotFound }],
         };
       }
     }
@@ -176,8 +257,39 @@ async function checkSite(site: SiteSpec, username: string): Promise<SiteResult> 
       if (!matchedNotFound && suspended) {
         const evidence: Evidence[] = [{ kind: 'pattern', value: 'Account suspended' }];
         if (canonicalOk && canonical) evidence.push({ kind: 'canonical', value: canonical });
-        return { id: site.id, status: 'found', url, latencyMs: Date.now() - start, evidence };
+        const metadata = extractMeta(body, url);
+        return { id: site.id, status: 'found', url, latencyMs: Date.now() - start, evidence, metadata };
       }
+    }
+
+    // Site-specific: GitHub — require avatar host or followers/following to avoid false positives
+    if (site.id === 'github') {
+      if (matchedNotFound) {
+        return { id: site.id, status: 'not_found', url, latencyMs: Date.now() - start, evidence: [{ kind: 'pattern', value: matchedNotFound }] };
+      }
+      const metadata = extractMeta(body, url);
+      const hasFollowers = /Followers/i.test(body) || /Following/i.test(body);
+      const hasAvatar = (() => {
+        try {
+          if (!metadata.image) return false;
+          const h = new URL(metadata.image).host.toLowerCase();
+          return h.endsWith('avatars.githubusercontent.com');
+        } catch { return false; }
+      })();
+      const baseOk = usernameOk && (canonicalOk || ogOk || finalUrlOk);
+      if (baseOk && (hasFollowers || hasAvatar)) {
+        const evidence: Evidence[] = [];
+        if (canonicalOk && canonical) evidence.push({ kind: 'canonical', value: canonical });
+        if (ogOk && ogUrl) evidence.push({ kind: 'og:url', value: ogUrl });
+        if (finalUrlOk && res.url) evidence.push({ kind: 'final_url', value: res.url });
+        if (hasFollowers) evidence.push({ kind: 'pattern', value: 'Followers/Following' });
+        return { id: site.id, status: 'found', url, latencyMs: Date.now() - start, evidence, metadata };
+      }
+      if (baseOk) {
+        // Canonical matches but no avatar/followers hints → avoid FP
+        return { id: site.id, status: 'inconclusive', url, latencyMs: Date.now() - start };
+      }
+      // fallthrough to generic
     }
 
     // Generic fallback: if site declares no successPatterns, accept canonical/og/final URL evidence
@@ -187,7 +299,8 @@ async function checkSite(site: SiteSpec, username: string): Promise<SiteResult> 
       if (ogOk && ogUrl) evidence.push({ kind: 'og:url', value: ogUrl });
       if (finalUrlOk && res.url) evidence.push({ kind: 'final_url', value: res.url });
       if (!evidence.length) evidence.push({ kind: 'username-text', value: (u ?? username) });
-      return { id: site.id, status: 'found', url, latencyMs: Date.now() - start, evidence };
+      const metadata = extractMeta(body, url);
+      return { id: site.id, status: 'found', url, latencyMs: Date.now() - start, evidence, metadata };
     }
 
     if (matchedSuccess && !matchedNotFound && usernameOk && (canonicalOk || ogOk || finalUrlOk)) {
@@ -196,7 +309,8 @@ async function checkSite(site: SiteSpec, username: string): Promise<SiteResult> 
       if (canonicalOk && canonical) evidence.push({ kind: 'canonical', value: canonical });
       if (ogOk && ogUrl) evidence.push({ kind: 'og:url', value: ogUrl });
       if (finalUrlOk && res.url) evidence.push({ kind: 'final_url', value: res.url });
-      return { id: site.id, status: 'found', url, latencyMs: Date.now() - start, evidence };
+      const metadata = extractMeta(body, url);
+      return { id: site.id, status: 'found', url, latencyMs: Date.now() - start, evidence, metadata };
     }
     if (matchedNotFound) {
       return { id: site.id, status: 'not_found', url, latencyMs: Date.now() - start, evidence: [{ kind: 'pattern', value: matchedNotFound }] };
@@ -251,7 +365,7 @@ export async function* runScan(opts: ScanOptions) {
     for (const s of batch) yield { type: 'site_start', id: s.id } as const;
     const results = await Promise.all(batch.map(s => checkSite(s, opts.username)));
     for (const r of results) {
-      yield { type: 'site_result', id: r.id, status: r.status, url: r.url, latencyMs: r.latencyMs, reason: r.reason, evidence: r.evidence } as const;
+      yield { type: 'site_result', id: r.id, status: r.status, url: r.url, latencyMs: r.latencyMs, reason: r.reason, evidence: r.evidence, metadata: r.metadata } as const;
       done += 1;
       yield { type: 'progress', done, total: sites.length } as const;
       await sleep(10);
@@ -270,7 +384,7 @@ export async function* runScanWithSites(sites: SiteSpec[], opts: { username: str
     for (const s of batch) yield { type: 'site_start', id: s.id } as const;
     const results = await Promise.all(batch.map(s => checkSite(s, opts.username)));
     for (const r of results) {
-      yield { type: 'site_result', id: r.id, status: r.status, url: r.url, latencyMs: r.latencyMs, reason: r.reason, evidence: r.evidence } as const;
+      yield { type: 'site_result', id: r.id, status: r.status, url: r.url, latencyMs: r.latencyMs, reason: r.reason, evidence: r.evidence, metadata: r.metadata } as const;
       done += 1;
       yield { type: 'progress', done, total: sites.length } as const;
     }
