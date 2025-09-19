@@ -164,14 +164,19 @@ async function checkSite(site: SiteSpec, username: string): Promise<SiteResult> 
           }
         })();
         const signalImage = Boolean(metadata.image && imageHostOk);
-        const signalsCount = [signalCanonical, signalUsername, signalJsonUser, signalImage].filter(Boolean).length;
+        const signalRedirect = Boolean(igEarlyEvidence && igEarlyEvidence.length);
+        const strongTwoSignal =
+          (signalCanonical && (signalUsername || signalJsonUser)) ||
+          (signalImage && (signalUsername || signalJsonUser));
+        const redirectTwoSignal = signalRedirect && (signalCanonical || signalJsonUser || signalImage);
 
-        if (signalsCount >= 2) {
+        if (strongTwoSignal || redirectTwoSignal) {
           const evidence: Evidence[] = [];
           if (canonicalOk && canonical) evidence.push({ kind: 'canonical', value: canonical });
           if (ogOk && ogUrl) evidence.push({ kind: 'og:url', value: ogUrl });
           if (signalUsername && !(canonicalOk || ogOk)) evidence.push({ kind: 'username-text', value: (u ?? username) });
           if (signalImage) evidence.push({ kind: 'pattern', value: 'profile_image' });
+          if (signalRedirect && igEarlyEvidence) evidence.push(...igEarlyEvidence);
           return { id: site.id, status: 'found', url, latencyMs: Date.now() - start, evidence, metadata };
         }
         // Final fallback: public web_profile_info endpoint (no login). Best-effort only.
