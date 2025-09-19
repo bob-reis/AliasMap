@@ -148,6 +148,8 @@ async function checkSite(site: SiteSpec, username: string): Promise<SiteResult> 
         const uname = (u ?? username).toLowerCase();
         const titleLc = (metadata.title || '').toLowerCase();
         const hasUserInTitle = titleLc.includes(`@${uname}`) || titleLc.includes(uname);
+        const jsonUser = body.match(/"username"\s*:\s*"([^"]+)"/i)?.[1]?.toLowerCase();
+        const userMatches = jsonUser === uname;
         if (usernameOk && (canonicalOk || ogOk)) {
           const evidence: Evidence[] = [];
           if (canonicalOk && canonical) evidence.push({ kind: 'canonical', value: canonical });
@@ -155,18 +157,8 @@ async function checkSite(site: SiteSpec, username: string): Promise<SiteResult> 
           if (!evidence.length) evidence.push({ kind: 'username-text', value: (u ?? username) });
           return { id: site.id, status: 'found', url, latencyMs: Date.now() - start, evidence, metadata };
         }
-        const imageHostOk = (() => {
-          try {
-            if (!metadata.image) return false;
-            const h = new URL(metadata.image).host.toLowerCase();
-            return h.includes('fbcdn.net') || h.includes('cdninstagram.com') || h.includes('instagram');
-          } catch {
-            return false;
-          }
-        })();
-        if (metadata.image && (hasUserInTitle || igEarlyEvidence || imageHostOk)) {
+        if (metadata.image && (hasUserInTitle || userMatches)) {
           const evidence: Evidence[] = [{ kind: 'pattern', value: 'og:image present' }];
-          if (igEarlyEvidence) evidence.push(...igEarlyEvidence);
           return { id: site.id, status: 'found', url, latencyMs: Date.now() - start, evidence, metadata };
         }
         // Final fallback: public web_profile_info endpoint (no login). Best-effort only.
@@ -176,18 +168,17 @@ async function checkSite(site: SiteSpec, username: string): Promise<SiteResult> 
           if (apiRes.ok && apiRes.headers.get('content-type')?.includes('application/json')) {
             const j: any = await apiRes.json();
             const user = j?.data?.user;
-            const pic = user?.profile_pic_url_hd || user?.profile_pic_url;
-            if (pic) {
-              const evidence: Evidence[] = [{ kind: 'pattern', value: 'api: web_profile_info' }];
-              if (igEarlyEvidence) evidence.push(...igEarlyEvidence);
-              return { id: site.id, status: 'found', url, latencyMs: Date.now() - start, evidence, metadata: { ...(metadata || {}), image: pic } };
+            if (user && user.username?.toLowerCase() === uname) {
+              const pic = user.profile_pic_url_hd || user.profile_pic_url;
+              if (pic) {
+                const evidence: Evidence[] = [{ kind: 'pattern', value: 'api: web_profile_info' }];
+                return { id: site.id, status: 'found', url, latencyMs: Date.now() - start, evidence, metadata: { ...(metadata || {}), image: pic } };
+              }
+            } else if (j?.data && 'user' in j.data && j.data.user === null) {
+              return { id: site.id, status: 'not_found', url, latencyMs: Date.now() - start };
             }
           }
         } catch { /* ignore */ }
-        if (igEarlyEvidence) {
-          // Fallback to early redirect signal as found to avoid regressions
-          return { id: site.id, status: 'found', url, latencyMs: Date.now() - start, evidence: igEarlyEvidence };
-        }
         // If we had early redirect evidence but could not extract an image, keep signal as inconclusive here.
       }
       if (matchedNotFound) {
