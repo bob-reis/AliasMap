@@ -69,7 +69,7 @@ export type SiteEvent =
   | { type: "progress"; done: number; total: number }
   | { type: "done"; summary: { done: number; total: number } };
 
-export type ResultsFilter = "focus" | "all" | "found" | "inconclusive" | "not_found" | "error";
+export type ResultsFilter = "focus" | "all" | "found" | "inconclusive";
 
 export type ResultsScreenProps = Readonly<{
   events: SiteEvent[];
