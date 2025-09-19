@@ -54,6 +54,38 @@ async function checkSite(site: SiteSpec, username: string): Promise<SiteResult> 
   try {
     const timeout = site.profile.timeoutMs ?? 3500;
 
+    // Instagram: quick search API to confirm existence and get avatar/full name
+    if (site.id === 'instagram') {
+      try {
+        const uname = (u ?? username).toLowerCase();
+        const apiUrl = `https://www.instagram.com/web/search/topsearch/?query=${encodeURIComponent(uname)}`;
+        const apiRes = await fetchWithTimeout(apiUrl, Math.min(timeout, 2500));
+        if (apiRes.ok && apiRes.headers.get('content-type')?.includes('application/json')) {
+          const j: any = await apiRes.json();
+          const users: any[] = Array.isArray(j?.users) ? j.users : [];
+          const match = users.find((it: any) => it?.user?.username?.toLowerCase() === uname)?.user;
+          if (match) {
+            const evidence: Evidence[] = [{ kind: 'pattern', value: 'api: topsearch' }];
+            const image = match.profile_pic_url_hd || match.profile_pic_url;
+            const title = match.full_name || undefined;
+            return {
+              id: site.id,
+              status: 'found',
+              url,
+              latencyMs: Date.now() - start,
+              evidence,
+              metadata: { image, title }
+            };
+          }
+          if (users.length === 0) {
+            return { id: site.id, status: 'not_found', url, latencyMs: Date.now() - start };
+          }
+        }
+      } catch {
+        // ignore and continue
+      }
+    }
+
     // Instagram: detect login redirect preserving username in `next` as strong existence signal
     let igEarlyEvidence: Evidence[] | undefined;
     if (site.id === 'instagram') {
