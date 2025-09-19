@@ -142,15 +142,27 @@ async function checkSite(site: SiteSpec, username: string): Promise<SiteResult> 
     const ogOk = matchesProfile(ogUrl ?? undefined);
     const finalUrlOk = matchesProfile(res.url);
 
-    // Site-specific tightening: Instagram requires canonical or og:url; URL path alone is not enough
+    // Site-specific tightening: Instagram profile pages often gate content.
+    // Strong signals:
+    // - canonical/og:url matches the expected profile URL, OR
+    // - og:image exists AND the title contains the @username (fallback)
     if (site.id === 'instagram') {
-      if (!matchedNotFound && usernameOk && (canonicalOk || ogOk)) {
-        const evidence: Evidence[] = [];
-        if (canonicalOk && canonical) evidence.push({ kind: 'canonical', value: canonical });
-        if (ogOk && ogUrl) evidence.push({ kind: 'og:url', value: ogUrl });
-        if (!evidence.length) evidence.push({ kind: 'username-text', value: (u ?? username) });
+      if (!matchedNotFound) {
         const metadata = extractMeta(body, expectedUrl);
-        return { id: site.id, status: 'found', url, latencyMs: Date.now() - start, evidence, metadata };
+        const uname = (u ?? username).toLowerCase();
+        const titleLc = (metadata.title || '').toLowerCase();
+        const hasUserInTitle = titleLc.includes(`@${uname}`) || titleLc.includes(uname);
+        if (usernameOk && (canonicalOk || ogOk)) {
+          const evidence: Evidence[] = [];
+          if (canonicalOk && canonical) evidence.push({ kind: 'canonical', value: canonical });
+          if (ogOk && ogUrl) evidence.push({ kind: 'og:url', value: ogUrl });
+          if (!evidence.length) evidence.push({ kind: 'username-text', value: (u ?? username) });
+          return { id: site.id, status: 'found', url, latencyMs: Date.now() - start, evidence, metadata };
+        }
+        if (metadata.image && hasUserInTitle) {
+          const evidence: Evidence[] = [{ kind: 'pattern', value: 'og:image & title match username' }];
+          return { id: site.id, status: 'found', url, latencyMs: Date.now() - start, evidence, metadata };
+        }
       }
       if (matchedNotFound) {
         return { id: site.id, status: 'not_found', url, latencyMs: Date.now() - start, evidence: [{ kind: 'pattern', value: matchedNotFound }] };
