@@ -150,15 +150,28 @@ async function checkSite(site: SiteSpec, username: string): Promise<SiteResult> 
         const hasUserInTitle = titleLc.includes(`@${uname}`) || titleLc.includes(uname);
         const jsonUser = body.match(/"username"\s*:\s*"([^"]+)"/i)?.[1]?.toLowerCase();
         const userMatches = jsonUser === uname;
-        if (usernameOk && (canonicalOk || ogOk)) {
+        // 2-signal rule for Instagram
+        const signalCanonical = (canonicalOk || ogOk);
+        const signalUsername = usernameOk || hasUserInTitle;
+        const signalJsonUser = userMatches;
+        const imageHostOk = (() => {
+          try {
+            if (!metadata.image) return false;
+            const h = new URL(metadata.image).host.toLowerCase();
+            return h.includes('fbcdn.net') || h.includes('cdninstagram.com') || h.includes('instagram');
+          } catch {
+            return false;
+          }
+        })();
+        const signalImage = Boolean(metadata.image && imageHostOk);
+        const signalsCount = [signalCanonical, signalUsername, signalJsonUser, signalImage].filter(Boolean).length;
+
+        if (signalsCount >= 2) {
           const evidence: Evidence[] = [];
           if (canonicalOk && canonical) evidence.push({ kind: 'canonical', value: canonical });
           if (ogOk && ogUrl) evidence.push({ kind: 'og:url', value: ogUrl });
-          if (!evidence.length) evidence.push({ kind: 'username-text', value: (u ?? username) });
-          return { id: site.id, status: 'found', url, latencyMs: Date.now() - start, evidence, metadata };
-        }
-        if (metadata.image && (hasUserInTitle || userMatches)) {
-          const evidence: Evidence[] = [{ kind: 'pattern', value: 'og:image present' }];
+          if (signalUsername && !(canonicalOk || ogOk)) evidence.push({ kind: 'username-text', value: (u ?? username) });
+          if (signalImage) evidence.push({ kind: 'pattern', value: 'profile_image' });
           return { id: site.id, status: 'found', url, latencyMs: Date.now() - start, evidence, metadata };
         }
         // Final fallback: public web_profile_info endpoint (no login). Best-effort only.
