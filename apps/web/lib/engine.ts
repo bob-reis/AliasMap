@@ -262,6 +262,36 @@ async function checkSite(site: SiteSpec, username: string): Promise<SiteResult> 
       }
     }
 
+    // Site-specific: GitHub — require avatar host or followers/following to avoid false positives
+    if (site.id === 'github') {
+      if (matchedNotFound) {
+        return { id: site.id, status: 'not_found', url, latencyMs: Date.now() - start, evidence: [{ kind: 'pattern', value: matchedNotFound }] };
+      }
+      const metadata = extractMeta(body, url);
+      const hasFollowers = /Followers/i.test(body) || /Following/i.test(body);
+      const hasAvatar = (() => {
+        try {
+          if (!metadata.image) return false;
+          const h = new URL(metadata.image).host.toLowerCase();
+          return h.endsWith('avatars.githubusercontent.com');
+        } catch { return false; }
+      })();
+      const baseOk = usernameOk && (canonicalOk || ogOk || finalUrlOk);
+      if (baseOk && (hasFollowers || hasAvatar)) {
+        const evidence: Evidence[] = [];
+        if (canonicalOk && canonical) evidence.push({ kind: 'canonical', value: canonical });
+        if (ogOk && ogUrl) evidence.push({ kind: 'og:url', value: ogUrl });
+        if (finalUrlOk && res.url) evidence.push({ kind: 'final_url', value: res.url });
+        if (hasFollowers) evidence.push({ kind: 'pattern', value: 'Followers/Following' });
+        return { id: site.id, status: 'found', url, latencyMs: Date.now() - start, evidence, metadata };
+      }
+      if (baseOk) {
+        // Canonical matches but no avatar/followers hints → avoid FP
+        return { id: site.id, status: 'inconclusive', url, latencyMs: Date.now() - start };
+      }
+      // fallthrough to generic
+    }
+
     // Generic fallback: if site declares no successPatterns, accept canonical/og/final URL evidence
     if ((!site.profile.successPatterns || site.profile.successPatterns.length === 0) && !matchedNotFound && usernameOk && (canonicalOk || ogOk || finalUrlOk)) {
       const evidence: Evidence[] = [];
