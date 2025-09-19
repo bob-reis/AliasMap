@@ -30,13 +30,22 @@ export default function SearchScreen({ onStart, loading = false }: SearchScreenP
         inputProps={{ "aria-label": "username" }}
       />
 
-      <Stack direction="row" spacing={1} flexShrink={0} justifyContent="flex-end">
+      {/* Container do botão: 100% no mobile, auto no desktop */}
+      <Stack
+        direction="row"
+        spacing={1}
+        flexShrink={0}
+        justifyContent={{ xs: "center", sm: "flex-end" }}
+        sx={{ width: { xs: "100%", sm: "auto" }, mt: { xs: 0, sm: 0 } }}
+      >
         <Button
           variant="contained"
           startIcon={<PlayArrowIcon />}
           onClick={() => onStart(trimmed)}
           disabled={!isValid || loading}
           aria-disabled={!isValid || loading}
+          // Botão ocupa a linha toda no mobile; no desktop fica no tamanho natural
+          sx={{ width: { xs: "100%", sm: "auto" } }}
         >
           Iniciar
         </Button>

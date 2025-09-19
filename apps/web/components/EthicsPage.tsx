@@ -1,4 +1,11 @@
-import { Container, Paper, Typography, Box, Alert, useTheme } from "@mui/material";
+import {
+  Container,
+  Paper,
+  Typography,
+  Box,
+  Alert,
+  useTheme,
+} from "@mui/material";
 import { AlertTriangle, Info, CheckCircle } from "lucide-react";
 import { disclaimerPt } from "../lib/constants";
 
@@ -6,28 +13,45 @@ export const metadata = { title: "Aviso e Uso Ético — AliasMap" };
 
 export default function EthicsPage() {
   const theme = useTheme();
+
   return (
-    <Container>
-      <Alert severity="warning" icon={<AlertTriangle size={20} />} sx={{ borderRadius: 2, background: "transparent" }}>
+    <Container maxWidth="md" sx={{ py: 4 }}>
+      {/* Alerta inicial */}
+      <Alert
+        severity="warning"
+        icon={<AlertTriangle size={20} />}
+        sx={{
+          borderRadius: 2,
+          backgroundColor: theme.palette.warning.light + "20", // leve transparência
+          mb: 3,
+        }}
+      >
         <Typography variant="body2" fontWeight="medium">
           Leia atentamente todos os termos antes de utilizar nossos serviços
         </Typography>
       </Alert>
+
+      {/* Bloco principal */}
       <Paper
-        elevation={1}
+        elevation={0}
         sx={{
-          p: 3,
-          backgroundColor: "transparent",
+          p: { xs: 2, md: 3 },
           borderRadius: 2,
-          border: "none",
+          border: `1px solid ${theme.palette.divider}`,
+          backgroundColor: "transparent",
         }}
       >
         <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-          <Info size={20} color={theme.palette.text.primary} style={{ marginRight: "8px" }} />
-          <Typography variant="h6" color={theme.palette.text.primary} fontWeight="medium">
+          <Info
+            size={20}
+            color={theme.palette.text.primary}
+            style={{ marginRight: 8 }}
+          />
+          <Typography variant="h6" fontWeight="medium">
             Aviso e Uso Ético
           </Typography>
         </Box>
+
         <Typography
           component="div"
           variant="body1"
@@ -42,13 +66,18 @@ export default function EthicsPage() {
           {disclaimerPt}
         </Typography>
       </Paper>
-      <Box sx={{ mt: 4, textAlign: "center" }}>
-        <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
-          <CheckCircle size={24} color="#4caf50" style={{ marginRight: "8px" }} />
-          <Typography variant="body2" color="success.main" fontWeight="medium">
+
+      {/* Confirmação final */}
+      <Box sx={{ mt: 4 }}>
+        <Alert
+          severity="success"
+          icon={<CheckCircle size={20} color="#4caf50" />}
+          sx={{ borderRadius: 2 }}
+        >
+          <Typography variant="body2" fontWeight="medium">
             Ao utilizar nossos serviços, você concorda com estes termos
           </Typography>
-        </Box>
+        </Alert>
       </Box>
     </Container>
   );
