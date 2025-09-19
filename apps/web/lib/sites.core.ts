@@ -91,7 +91,10 @@ export const CORE_SITES: SiteSpec[] = [
       ],
       notFoundPatterns: [
         "Sorry, this page isn't available.",
-        'Esta página não está disponível'
+        'Esta página não está disponível',
+        'O link em que você clicou pode não estar funcionando',
+        'a página pode ter sido removida',
+        'Voltar para o Instagram'
       ],
       timeoutMs: 3500
     },
