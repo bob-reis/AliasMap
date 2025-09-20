@@ -27,13 +27,12 @@ describe('runFastRecon (status-only fast mode)', () => {
       if (url.includes('/error/')) {
         throw new Error('boom');
       }
-      return { status: 418, url, text: async () => '' } as any; // default inconclusive
+      return { status: 418, url, text: async () => '' } as any;
     });
   });
 
   afterEach(() => {
     vi.useRealTimers();
-    // @ts-expect-error - restore
     global.fetch = originalFetch;
   });
 

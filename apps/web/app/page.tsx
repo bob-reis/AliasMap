@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Image from "next/image";
-import logo from "./icon.svg";
+import logo from "./icon.png";
 import { Box, Container, Paper, Stack, Typography, IconButton, Tooltip } from "@mui/material";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import GavelIcon from "@mui/icons-material/Gavel";
@@ -130,34 +130,38 @@ export default function HomeStepsSimple() {
           justifyContent: "center",
         }}
       >
-        <Stack
-          direction="row"
-          alignItems="center"
-          justifyContent="space-between"
-          sx={{ width: "100%", p: { xs: 2, md: 3 } }}
-        >
-          <Stack direction="row" spacing={1.5} alignItems="center">
-            <Image src={logo} alt="AliasMap logo" width={32} height={32} style={{ borderRadius: 6 }} />
-            <Typography variant="h5" fontWeight={800}>
+        <Stack direction="column" alignItems="center" spacing={2} sx={{ width: "100%", p: { xs: 2, md: 3 } }}>
+          {/* Linha 1: Logo grande */}
+          <Image
+            src={logo}
+            alt="AliasMap logo"
+            width={120} // ajuste o tamanho que preferir
+            height={120}
+            style={{ borderRadius: 12 }}
+          />
+
+          {/* Linha 2: Título + Botões */}
+          <Stack direction="row" alignItems="center" spacing={2} justifyContent="center">
+            <Typography variant="h4" fontWeight={800}>
               AliasMap
             </Typography>
+
+            {step > 0 && (
+              <Tooltip title="Reiniciar">
+                <IconButton onClick={resetAll}>
+                  <RestartAltIcon />
+                </IconButton>
+              </Tooltip>
+            )}
+
+            {step === 0 && (
+              <Tooltip title="Aviso e Uso Ético">
+                <IconButton onClick={handleEthicsClick}>
+                  <GavelIcon />
+                </IconButton>
+              </Tooltip>
+            )}
           </Stack>
-
-          {step > 0 && (
-            <Tooltip title="Reiniciar">
-              <IconButton onClick={resetAll}>
-                <RestartAltIcon />
-              </IconButton>
-            </Tooltip>
-          )}
-
-          {step === 0 && (
-            <Tooltip title="Aviso e Uso Ético">
-              <IconButton onClick={handleEthicsClick}>
-                <GavelIcon />
-              </IconButton>
-            </Tooltip>
-          )}
         </Stack>
 
         <Paper
