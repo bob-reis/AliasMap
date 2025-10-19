@@ -146,7 +146,7 @@ export default function HomeStepsSimple() {
               AliasMap
             </Typography>
 
-            {step > 0 && (
+            {step > 0 && step != 1 && (
               <Tooltip title="Reiniciar">
                 <IconButton onClick={resetAll}>
                   <RestartAltIcon />
