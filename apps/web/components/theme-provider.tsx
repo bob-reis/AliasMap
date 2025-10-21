@@ -28,7 +28,7 @@ const DARK = {
     dark: "#006118ff",
   },
   secondary: { main: "#F9FAFB" },
-  background: { default: "#010409e6", paper: "#010409e6" },
+  background: { default: "#000", paper: "#000" },
   text: { primary: "#FFFFFF", secondary: "#9CA3AF" },
   error: { main: "#EF4444" },
   found: "#10B981",
